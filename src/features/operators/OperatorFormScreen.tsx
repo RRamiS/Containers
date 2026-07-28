@@ -23,6 +23,8 @@ export function OperatorFormScreen() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [license, setLicense] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [active, setActive] = useState(true);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -42,6 +44,8 @@ export function OperatorFormScreen() {
         setFullName(item.full_name);
         setPhone(item.phone);
         setLicense(item.license);
+        setUsername(item.username || '');
+        setPassword(item.password || '');
         setActive(item.active);
       } finally {
         setLoading(false);
@@ -60,6 +64,8 @@ export function OperatorFormScreen() {
         full_name: fullName.trim(),
         phone: phone.trim(),
         license: license.trim(),
+        username: username.trim(),
+        password: password.trim(),
         active,
       };
       if (isNew) await operatorsRepo.create(payload);
@@ -101,6 +107,26 @@ export function OperatorFormScreen() {
         <TextField label="Nombre completo" value={fullName} onChangeText={setFullName} />
         <TextField label="Teléfono" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
         <TextField label="Licencia" value={license} onChangeText={setLicense} />
+        
+        <View style={styles.sectionDivider}>
+          <Text style={styles.sectionTitle}>Credenciales de Acceso (Login)</Text>
+        </View>
+
+        <TextField
+          label="Usuario (Login)"
+          value={username}
+          onChangeText={setUsername}
+          autoCapitalize="none"
+          placeholder="ej: chofer1"
+        />
+        <TextField
+          label="Contraseña"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          placeholder="Ingresá contraseña"
+        />
+
         <Pressable style={styles.toggle} onPress={() => setActive((v) => !v)}>
           <Text style={styles.toggleLabel}>Estado</Text>
           <Text style={[styles.toggleValue, { color: active ? colors.success : colors.textMuted }]}>
@@ -122,6 +148,20 @@ export function OperatorFormScreen() {
 const styles = StyleSheet.create({
   content: { paddingBottom: spacing.xl },
   actions: { gap: spacing.sm, marginTop: spacing.md },
+  sectionDivider: {
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: spacing.xs,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   toggle: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -131,7 +171,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 10,
     padding: spacing.md,
-    marginBottom: spacing.md,
+    marginVertical: spacing.md,
   },
   toggleLabel: { fontWeight: '600', color: colors.text },
   toggleValue: { fontWeight: '600' },

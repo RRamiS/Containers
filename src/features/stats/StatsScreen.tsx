@@ -26,6 +26,11 @@ import { industry } from '@/config/industry';
 import { rentalsRepo } from '@/data/repositories';
 import type { RentalWithRelations } from '@/data/types';
 import { exportTransactionsCsv, formatOpId } from '@/features/exports/exportCsv';
+import { RentalDetailsModal } from '@/features/rentals/RentalDetailsModal';
+import { LocationViewerModal } from '@/core/map/LocationViewerModal';
+import { handleOpenReceipt } from '@/features/rentals/openReceipt';
+import { AnalyticsCharts } from './AnalyticsCharts';
+import { formatDateOnly, formatRegistrationTimestamp } from '@/core/utils/formatDate';
 import { radius, spacing } from '@/core/theme';
 import { useTheme } from '@/core/theme/ThemeContext';
 import { toast } from '@/core/ui/ToastContext';
@@ -381,6 +386,19 @@ export function StatsScreen() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
+  // Modales de Detalle y Ubicación de Mapa
+  const [selectedDetailsRental, setSelectedDetailsRental] = useState<RentalWithRelations | null>(null);
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [selectedLocationRental, setSelectedLocationRental] = useState<RentalWithRelations | null>(null);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
+
+  // Orden ascendente de alquileres para IDs secuenciales (#0000, #0001, ...)
+  const rentalsAscending = useMemo(() => {
+    return [...rentals].sort(
+      (a, b) => (a.created_at || '').localeCompare(b.created_at || '') || a.id.localeCompare(b.id)
+    );
+  }, [rentals]);
+
   // Estados de Filtros
   const [searchQuery, setSearchQuery] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('all');
@@ -513,35 +531,12 @@ export function StatsScreen() {
   return (
     <Screen loading={loading}>
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Dashboard de Métricas Financieras y Operativas */}
-        <View style={[styles.metricsCard, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]}>
-          <Text style={[styles.metricsTitle, { color: theme.text }]}>Resumen Financiero y Operativo</Text>
-          <View style={styles.metricsGrid}>
-            <View style={[styles.statBox, { backgroundColor: theme.background, borderLeftColor: '#2E7D32' }]}>
-              <Text style={[styles.statAmount, { color: '#2E7D32' }]}>
-                ${metrics.paidTotal.toLocaleString('es-AR')}
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Total Cobrado</Text>
-            </View>
-
-            <View style={[styles.statBox, { backgroundColor: theme.background, borderLeftColor: '#E65100' }]}>
-              <Text style={[styles.statAmount, { color: '#E65100' }]}>
-                ${metrics.pendingTotal.toLocaleString('es-AR')}
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Pendiente de Cobro</Text>
-            </View>
-
-            <View style={[styles.statBox, { backgroundColor: theme.background, borderLeftColor: '#1565C0' }]}>
-              <Text style={[styles.statAmount, { color: '#1565C0' }]}>{metrics.activeCount}</Text>
-              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Operaciones Activas</Text>
-            </View>
-
-            <View style={[styles.statBox, { backgroundColor: theme.background, borderLeftColor: '#757575' }]}>
-              <Text style={[styles.statAmount, { color: '#757575' }]}>{metrics.finishedCount}</Text>
-              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Finalizadas</Text>
-            </View>
-          </View>
-        </View>
+        {/* Dashboard de Analítica e Indicadores Financieros con Gráficos (Dark Mode) */}
+        <AnalyticsCharts
+          rentals={rentals}
+          onRefresh={load}
+          onDownloadReport={handleExport}
+        />
 
         {/* Barra de Filtros Flotante (Fondo Transparente sobre theme.background) */}
         <View style={styles.filterFloatingToolbar}>
@@ -612,12 +607,13 @@ export function StatsScreen() {
             contentContainerStyle={styles.tableScrollContainer}
           >
             <View style={[styles.tableWrapper, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]}>
-              {/* Header Redondeado (11 Columnas) */}
+              {/* Header Redondeado (12 Columnas) */}
               <View style={[styles.tableHeaderRow, { backgroundColor: theme.tableHeaderBg }]}>
                 <Text style={[styles.headerCell, styles.colOpId, { color: theme.textMuted }]}>ID Operación</Text>
                 <Text style={[styles.headerCell, styles.colClient, { color: theme.textMuted }]}>Cliente</Text>
                 <Text style={[styles.headerCell, styles.colLocation, { color: theme.textMuted }]}>Ubicación</Text>
-                <Text style={[styles.headerCell, styles.colDate, { color: theme.textMuted }]}>Fecha Entrega</Text>
+                <Text style={[styles.headerCell, styles.colRegDate, { color: theme.textMuted }]}>Fecha Registro</Text>
+                <Text style={[styles.headerCell, styles.colDeliveryDate, { color: theme.textMuted }]}>Fecha Entrega</Text>
                 <Text style={[styles.headerCell, styles.colDays, { color: theme.textMuted }]}>Días Estac.</Text>
                 <Text style={[styles.headerCell, styles.colUnitAmount, { color: theme.textMuted }]}>Monto Unit. ($)</Text>
                 <Text style={[styles.headerCell, styles.colAmount, { color: theme.textMuted }]}>Monto Total ($)</Text>
@@ -642,7 +638,8 @@ export function StatsScreen() {
                   renderItem={({ item }) => {
                     const isPaid = item.payment_status === 'realizado';
                     const st = industry.rentalStatuses.find((s) => s.value === item.status);
-                    const formattedId = formatOpId(item.id);
+                    const seqIndex = rentalsAscending.findIndex((r) => r.id === item.id);
+                    const formattedId = formatOpId(item.id, seqIndex >= 0 ? seqIndex : undefined);
                     const avatarColor = getClientAvatarColor(item.client_name);
                     const initialLetter = item.client_name ? item.client_name.charAt(0).toUpperCase() : 'C';
 
@@ -655,16 +652,15 @@ export function StatsScreen() {
 
                     return (
                       <Pressable
-                        style={({ pressed }) => [
+                        style={({ pressed, hovered }: any) => [
                           styles.tableBodyRow,
                           {
-                            backgroundColor: pressed ? (isDark ? '#1F2732' : '#F1F5F9') : theme.tableRowBg,
+                            backgroundColor: (hovered || pressed) ? (isDark ? '#232C37' : '#F1F5F9') : theme.tableRowBg,
                             borderBottomColor: theme.border,
                           },
                         ]}
-                        onPress={() => router.push(`/rentals/${item.id}`)}
                       >
-                        {/* 1. ID Operación (#4586936) + Copy Icon */}
+                        {/* 1. ID Operación (#0000) + Copiar */}
                         <View style={styles.colOpId}>
                           <Text style={[styles.opIdText, { color: theme.text }]}>{formattedId}</Text>
                           <Pressable
@@ -689,16 +685,38 @@ export function StatsScreen() {
                           </Text>
                         </View>
 
-                        {/* 3. Ubicación */}
+                        {/* 3. Ubicación (Texto breve truncado con ícono external-link) */}
                         <View style={styles.colLocation}>
-                          <Text style={[styles.cellText, { color: theme.textMuted }]} numberOfLines={1}>
-                            {item.address || 'Sin dirección'}
+                          <Pressable
+                            style={({ pressed }) => [
+                              styles.locationPressableBtn,
+                              pressed && { opacity: 0.7 },
+                            ]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setSelectedLocationRental(item);
+                              setLocationModalVisible(true);
+                            }}
+                          >
+                            <Text style={[styles.cellText, { color: theme.text, flexShrink: 1 }]} numberOfLines={1}>
+                              {item.address || 'Sin dirección'}
+                            </Text>
+                            <Feather name="external-link" size={13} color="#0084FF" style={{ marginLeft: 6 }} />
+                          </Pressable>
+                        </View>
+
+                        {/* 4. Fecha Registro (Con hora completa: Dec 8, 2025 · 12:32 PM) */}
+                        <View style={styles.colRegDate}>
+                          <Text style={styles.regDateText} numberOfLines={1}>
+                            {formatRegistrationTimestamp(item.created_at)}
                           </Text>
                         </View>
 
-                        {/* 4. Fecha Entrega */}
-                        <View style={styles.colDate}>
-                          <Text style={[styles.cellText, { color: theme.text }]}>{item.start_date}</Text>
+                        {/* 5. Fecha Entrega (Sin hora) */}
+                        <View style={styles.colDeliveryDate}>
+                          <Text style={[styles.cellText, { color: theme.text }]} numberOfLines={1}>
+                            {formatDateOnly(item.start_date)}
+                          </Text>
                         </View>
 
                         {/* 5. Días Estacionamiento */}
@@ -745,19 +763,27 @@ export function StatsScreen() {
                           </View>
                         </View>
 
-                        {/* 9. Comprobante */}
+                        {/* 9. Comprobante (Abre o descarga de forma independiente) */}
                         <View style={styles.colReceipt}>
-                          <Text
-                            style={[
-                              styles.receiptBadge,
-                              item.receipt_name
-                                ? { backgroundColor: theme.border, color: theme.text }
-                                : { color: theme.textMuted },
-                            ]}
-                            numberOfLines={1}
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              void handleOpenReceipt(item.receipt_uri, item.receipt_name);
+                            }}
+                            hitSlop={4}
                           >
-                            {item.receipt_name ? `📄 ${item.receipt_name}` : 'Sin archivo'}
-                          </Text>
+                            <Text
+                              style={[
+                                styles.receiptBadge,
+                                item.receipt_name
+                                  ? { backgroundColor: 'rgba(0, 132, 255, 0.15)', color: '#0084FF' }
+                                  : { color: theme.textMuted },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {item.receipt_name ? `📄 ${item.receipt_name}` : 'Sin archivo'}
+                            </Text>
+                          </Pressable>
                         </View>
 
                         {/* 10. Estado Operativo */}
@@ -783,13 +809,15 @@ export function StatsScreen() {
                         {/* 11. Columna de Acciones con Íconos Circulares */}
                         <View style={styles.colActions}>
                           <Pressable
-                            style={[
+                            style={({ pressed }) => [
                               styles.actionIconCircle,
                               { backgroundColor: isDark ? '#242C37' : '#F1F5F9' },
+                              pressed && { opacity: 0.7 },
                             ]}
                             onPress={(e) => {
                               e.stopPropagation();
-                              router.push(`/rentals/${item.id}`);
+                              setSelectedDetailsRental(item);
+                              setDetailsModalVisible(true);
                             }}
                             hitSlop={4}
                           >
@@ -797,9 +825,10 @@ export function StatsScreen() {
                           </Pressable>
 
                           <Pressable
-                            style={[
+                            style={({ pressed }) => [
                               styles.actionIconCircle,
                               { backgroundColor: isDark ? '#242C37' : '#F1F5F9' },
+                              pressed && { opacity: 0.7 },
                             ]}
                             onPress={(e) => {
                               e.stopPropagation();
@@ -811,7 +840,11 @@ export function StatsScreen() {
                           </Pressable>
 
                           <Pressable
-                            style={[styles.actionIconCircle, styles.actionDeleteCircle]}
+                            style={({ pressed }) => [
+                              styles.actionIconCircle,
+                              styles.actionDeleteCircle,
+                              pressed && { opacity: 0.7 },
+                            ]}
                             onPress={(e) => {
                               e.stopPropagation();
                               handleDelete(item);
@@ -830,6 +863,32 @@ export function StatsScreen() {
           </ScrollView>
         </View>
       </ScrollView>
+
+      {/* Modal exclusivo de Vista de Detalles de Transacción al clickear en el Ojo (👁️) */}
+      <RentalDetailsModal
+        visible={detailsModalVisible}
+        rental={selectedDetailsRental}
+        formattedId={
+          selectedDetailsRental
+            ? formatOpId(
+                selectedDetailsRental.id,
+                rentalsAscending.findIndex((r) => r.id === selectedDetailsRental.id)
+              )
+            : '#0000'
+        }
+        onClose={() => setDetailsModalVisible(false)}
+        onEdit={(rentalToEdit) => router.push(`/rentals/${rentalToEdit.id}`)}
+      />
+
+      {/* Modal exclusivo de Ubicación de Mapa No Editable */}
+      <LocationViewerModal
+        visible={locationModalVisible}
+        clientName={selectedLocationRental?.client_name || ''}
+        address={selectedLocationRental?.address || ''}
+        lat={selectedLocationRental?.lat ?? null}
+        lng={selectedLocationRental?.lng ?? null}
+        onClose={() => setLocationModalVisible(false)}
+      />
     </Screen>
   );
 }
@@ -909,6 +968,10 @@ const styles = StyleSheet.create({
   },
   clearSearchBtn: {
     padding: 3,
+  },
+  locationPressableBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 
   /* Dropdown Trigger Píldora */
@@ -1152,8 +1215,8 @@ const styles = StyleSheet.create({
   },
 
   colClient: {
-    minWidth: 140,
-    flex: 1.4,
+    minWidth: 110,
+    flex: 0.9,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -1182,10 +1245,20 @@ const styles = StyleSheet.create({
     flex: 1.3,
     paddingRight: 6,
   },
-  colDate: {
+  colRegDate: {
+    minWidth: 140,
+    flex: 1.4,
+    paddingRight: 6,
+  },
+  colDeliveryDate: {
     minWidth: 95,
     flex: 0.9,
     paddingRight: 6,
+  },
+  regDateText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#38BDF8',
   },
   colDays: {
     minWidth: 70,

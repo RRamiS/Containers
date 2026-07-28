@@ -78,14 +78,17 @@ export async function exportRentalsCsv(rentals: RentalWithRelations[], filename 
   });
 }
 
-export function formatOpId(id: string): string {
-  if (!id) return '#4586900';
+export function formatOpId(id: string, index?: number): string {
+  if (index != null && index >= 0) {
+    return `#${String(index).padStart(4, '0')}`;
+  }
+  if (!id) return '#0000';
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) % 9000000;
+    hash = (hash * 31 + id.charCodeAt(i)) % 1000;
   }
-  const numericCode = 1000000 + Math.abs(hash);
-  return `#${numericCode}`;
+  const numericCode = Math.abs(hash);
+  return `#${String(numericCode).padStart(4, '0')}`;
 }
 
 export function transactionsToCsv(rentals: RentalWithRelations[]): string {

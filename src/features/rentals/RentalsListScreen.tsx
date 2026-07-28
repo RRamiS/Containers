@@ -14,6 +14,7 @@ import {
   eachDayOfInterval,
   endOfMonth,
   format,
+  parseISO,
   startOfMonth,
   subDays,
   subMonths,
@@ -25,6 +26,9 @@ import { industry } from '@/config/industry';
 import { operatorsRepo, rentalsRepo } from '@/data/repositories';
 import type { Operator, RentalWithRelations } from '@/data/types';
 import { exportRentalsCsv, formatOpId } from '@/features/exports/exportCsv';
+import { RentalDetailsModal } from './RentalDetailsModal';
+import { LocationViewerModal } from '@/core/map/LocationViewerModal';
+import { formatDateOnly, formatRegistrationTimestamp } from '@/core/utils/formatDate';
 import { Screen } from '@/core/ui/Screen';
 import { spacing } from '@/core/theme';
 import { useTheme } from '@/core/theme/ThemeContext';
@@ -365,6 +369,19 @@ export function RentalsListScreen() {
   const [operators, setOperators] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Modal de Detalle y Mapa
+  const [selectedDetailsRental, setSelectedDetailsRental] = useState<RentalWithRelations | null>(null);
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [selectedLocationRental, setSelectedLocationRental] = useState<RentalWithRelations | null>(null);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
+
+  // Orden ascendente de alquileres por fecha de creación para IDs secuenciales (#0000, #0001, ...)
+  const rentalsAscending = useMemo(() => {
+    return [...rentals].sort(
+      (a, b) => (a.created_at || '').localeCompare(b.created_at || '') || a.id.localeCompare(b.id)
+    );
+  }, [rentals]);
+
   // Filtros
   const [statusFilter, setStatusFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
@@ -428,9 +445,61 @@ export function RentalsListScreen() {
     }
   };
 
+  // Filtro de Pestañas por Día (Hoy, Mañana, Días futuros con eventos hasta 7 max)
+  const [selectedDayTab, setSelectedDayTab] = useState<string>('all');
+
+  const dayTabOptions = useMemo(() => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const dateMap = new Map<string, { count: number; dateObj: Date }>();
+
+    rentals.forEach((r) => {
+      if (r.start_date) {
+        const c = dateMap.get(r.start_date)?.count || 0;
+        try {
+          dateMap.set(r.start_date, { count: c + 1, dateObj: parseISO(r.start_date) });
+        } catch {}
+      }
+      if (r.end_date) {
+        const c = dateMap.get(r.end_date)?.count || 0;
+        try {
+          dateMap.set(r.end_date, { count: c + 1, dateObj: parseISO(r.end_date) });
+        } catch {}
+      }
+    });
+
+    if (!dateMap.has(today)) {
+      dateMap.set(today, { count: 0, dateObj: new Date() });
+    }
+
+    const sortedDates = Array.from(dateMap.keys()).sort((a, b) => a.localeCompare(b));
+    // Limitar a máximo 7 fechas relevantes
+    const max7Dates = sortedDates.slice(0, 7);
+
+    return [
+      { value: 'all', label: `Todos (${rentals.length})` },
+      ...max7Dates.map((d) => {
+        const isToday = d === today;
+        const count = dateMap.get(d)?.count || 0;
+        let dayLabel = isToday ? 'Hoy' : format(parseISO(d), 'dd MMM', { locale: es });
+        if (isToday) {
+          dayLabel = `Hoy (${format(new Date(), 'dd MMM', { locale: es })})`;
+        }
+        return {
+          value: d,
+          label: `${dayLabel} (${count})`,
+        };
+      }),
+    ];
+  }, [rentals]);
+
   // Filtrado Multicriterio
   const filteredRentals = useMemo(() => {
     return rentals.filter((r) => {
+      if (selectedDayTab !== 'all') {
+        if (r.start_date !== selectedDayTab && r.end_date !== selectedDayTab) {
+          return false;
+        }
+      }
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
       if (paymentFilter !== 'all' && (r.payment_status || 'pendiente') !== paymentFilter) return false;
       if (operatorFilter !== 'all' && r.delivery_operator_id !== operatorFilter && r.pickup_operator_id !== operatorFilter) {
@@ -449,11 +518,40 @@ export function RentalsListScreen() {
       }
       return true;
     });
-  }, [rentals, statusFilter, paymentFilter, operatorFilter, startDateFilter, endDateFilter, searchQuery]);
+  }, [rentals, selectedDayTab, statusFilter, paymentFilter, operatorFilter, startDateFilter, endDateFilter, searchQuery]);
 
   return (
     <Screen loading={loading}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        {/* Barra de Pestañas por Día (Hoy, Mañana, Días futuros con eventos hasta 7 max) */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.dayTabsScrollContainer}
+        >
+          <View
+            style={[
+              styles.dayTabsSegmentedPill,
+              { backgroundColor: isDark ? '#161B22' : '#EFF2F5', borderColor: theme.surfaceBorder },
+            ]}
+          >
+            {dayTabOptions.map((tab) => {
+              const isActive = selectedDayTab === tab.value;
+              return (
+                <Pressable
+                  key={tab.value}
+                  style={[styles.dayTabItem, isActive && styles.dayTabItemActive]}
+                  onPress={() => setSelectedDayTab(tab.value)}
+                >
+                  <Text style={[styles.dayTabText, isActive && styles.dayTabTextActive]}>
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </ScrollView>
+
         {/* Toolbar Superior: Filtros Flotantes y Buscador Pill */}
         <View style={styles.floatingToolbar}>
           <View style={styles.filterPillsRow}>
@@ -519,7 +617,7 @@ export function RentalsListScreen() {
               <Text style={[styles.actionPillText, { color: theme.text }]}>Exportar CSV</Text>
             </Pressable>
 
-            {/* Botón Píldora Principal: + Nuevo Alquiler */}
+            {/* Botón Píldora Principal: Nuevo Alquiler */}
             <Pressable
               style={({ pressed }) => [
                 styles.primaryPillBtn,
@@ -528,7 +626,7 @@ export function RentalsListScreen() {
               onPress={() => router.push('/rentals/new')}
             >
               <Feather name="plus" size={14} color="#FFFFFF" style={{ marginRight: 5 }} />
-              <Text style={styles.primaryPillText}>+ Nuevo Alquiler</Text>
+              <Text style={styles.primaryPillText}>Nuevo Alquiler</Text>
             </Pressable>
           </View>
 
@@ -555,7 +653,9 @@ export function RentalsListScreen() {
                 <Text style={[styles.headerCell, styles.colOpId, { color: theme.textMuted }]}>ID Operación</Text>
                 <Text style={[styles.headerCell, styles.colClient, { color: theme.textMuted }]}>Cliente</Text>
                 <Text style={[styles.headerCell, styles.colLocation, { color: theme.textMuted }]}>Ubicación</Text>
-                <Text style={[styles.headerCell, styles.colDate, { color: theme.textMuted }]}>Fecha / Días</Text>
+                <Text style={[styles.headerCell, styles.colRegDate, { color: theme.textMuted }]}>Fecha Registro</Text>
+                <Text style={[styles.headerCell, styles.colDeliveryDate, { color: theme.textMuted }]}>Fecha Entrega</Text>
+                <Text style={[styles.headerCell, styles.colDays, { color: theme.textMuted }]}>Días Alquiler</Text>
                 <Text style={[styles.headerCell, styles.colOperator, { color: theme.textMuted }]}>Chofer</Text>
                 <Text style={[styles.headerCell, styles.colAmount, { color: theme.textMuted }]}>Monto Total ($)</Text>
                 <Text style={[styles.headerCell, styles.colPayment, { color: theme.textMuted }]}>Estado Cobro</Text>
@@ -578,7 +678,8 @@ export function RentalsListScreen() {
                   renderItem={({ item }) => {
                     const isPaid = item.payment_status === 'realizado';
                     const st = industry.rentalStatuses.find((s) => s.value === item.status);
-                    const formattedId = formatOpId(item.id);
+                    const seqIndex = rentalsAscending.findIndex((r) => r.id === item.id);
+                    const formattedId = formatOpId(item.id, seqIndex >= 0 ? seqIndex : undefined);
                     const avatarColor = getClientAvatarColor(item.client_name);
                     const initialLetter = item.client_name ? item.client_name.charAt(0).toUpperCase() : 'C';
 
@@ -589,14 +690,13 @@ export function RentalsListScreen() {
 
                     return (
                       <Pressable
-                        style={({ pressed }) => [
+                        style={({ pressed, hovered }: any) => [
                           styles.tableBodyRow,
                           {
-                            backgroundColor: pressed ? (isDark ? '#1F2732' : '#F1F5F9') : theme.tableRowBg,
+                            backgroundColor: (hovered || pressed) ? (isDark ? '#232C37' : '#F1F5F9') : theme.tableRowBg,
                             borderBottomColor: theme.border,
                           },
                         ]}
-                        onPress={() => router.push(`/rentals/${item.id}`)}
                       >
                         {/* 1. ID Operación (#4586936) + Copiar */}
                         <View style={styles.colOpId}>
@@ -623,24 +723,48 @@ export function RentalsListScreen() {
                           </Text>
                         </View>
 
-                        {/* 3. Ubicación */}
+                        {/* 3. Ubicación (Texto breve truncado con ícono external-link) */}
                         <View style={styles.colLocation}>
-                          <Text style={[styles.cellText, { color: theme.text }]} numberOfLines={1}>
-                            {item.address || 'Sin dirección registrada'}
+                          <Pressable
+                            style={({ pressed }) => [
+                              styles.locationPressableBtn,
+                              pressed && { opacity: 0.7 },
+                            ]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setSelectedLocationRental(item);
+                              setLocationModalVisible(true);
+                            }}
+                          >
+                            <Text style={[styles.cellText, { color: theme.text, flexShrink: 1 }]} numberOfLines={1}>
+                              {item.address || 'Sin dirección'}
+                            </Text>
+                            <Feather name="external-link" size={13} color="#0084FF" style={{ marginLeft: 6 }} />
+                          </Pressable>
+                        </View>
+
+                        {/* 4. Fecha Registro (Con hora completa: Dec 8, 2025 · 12:32 PM) */}
+                        <View style={styles.colRegDate}>
+                          <Text style={styles.regDateText} numberOfLines={1}>
+                            {formatRegistrationTimestamp(item.created_at)}
                           </Text>
                         </View>
 
-                        {/* 4. Fecha / Días */}
-                        <View style={styles.colDate}>
+                        {/* 5. Fecha Entrega (Sin hora: YYYY-MM-DD) */}
+                        <View style={styles.colDeliveryDate}>
+                          <Text style={[styles.cellText, { color: theme.text }]} numberOfLines={1}>
+                            {formatDateOnly(item.start_date)}
+                          </Text>
+                        </View>
+
+                        {/* 6. Días Alquiler */}
+                        <View style={styles.colDays}>
                           <Text style={[styles.cellTextBold, { color: theme.text }]}>
                             {item.rental_days} días
                           </Text>
-                          <Text style={[styles.cellSubText, { color: theme.textMuted }]}>
-                            {item.start_date}
-                          </Text>
                         </View>
 
-                        {/* 5. Chofer Asignado */}
+                        {/* 7. Chofer Asignado */}
                         <View style={styles.colOperator}>
                           <Text style={[styles.cellText, { color: theme.text }]} numberOfLines={1}>
                             {operatorName || 'Sin asignar'}
@@ -684,7 +808,8 @@ export function RentalsListScreen() {
                             ]}
                             onPress={(e) => {
                               e.stopPropagation();
-                              router.push(`/rentals/${item.id}`);
+                              setSelectedDetailsRental(item);
+                              setDetailsModalVisible(true);
                             }}
                             hitSlop={6}
                           >
@@ -730,6 +855,32 @@ export function RentalsListScreen() {
           </ScrollView>
         </View>
       </ScrollView>
+
+      {/* Modal exclusivo de Vista de Detalles al clickear en el Ojo (👁️) */}
+      <RentalDetailsModal
+        visible={detailsModalVisible}
+        rental={selectedDetailsRental}
+        formattedId={
+          selectedDetailsRental
+            ? formatOpId(
+                selectedDetailsRental.id,
+                rentalsAscending.findIndex((r) => r.id === selectedDetailsRental.id)
+              )
+            : '#0000'
+        }
+        onClose={() => setDetailsModalVisible(false)}
+        onEdit={(rentalToEdit) => router.push(`/rentals/${rentalToEdit.id}`)}
+      />
+
+      {/* Modal exclusivo de Ubicación de Mapa No Editable */}
+      <LocationViewerModal
+        visible={locationModalVisible}
+        clientName={selectedLocationRental?.client_name || ''}
+        address={selectedLocationRental?.address || ''}
+        lat={selectedLocationRental?.lat ?? null}
+        lng={selectedLocationRental?.lng ?? null}
+        onClose={() => setLocationModalVisible(false)}
+      />
     </Screen>
   );
 }
@@ -793,6 +944,10 @@ const styles = StyleSheet.create({
   dropdownTriggerText: {
     fontSize: 13,
     fontWeight: '500',
+  },
+  locationPressableBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   popoverBackdrop: {
     position: 'fixed' as any,
@@ -1023,8 +1178,8 @@ const styles = StyleSheet.create({
   },
 
   colClient: {
-    minWidth: 140,
-    flex: 1.4,
+    minWidth: 110,
+    flex: 0.9,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -1047,15 +1202,58 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
+  /* Pestañas por Día */
+  dayTabsScrollContainer: {
+    paddingBottom: 4,
+  },
+  dayTabsSegmentedPill: {
+    flexDirection: 'row',
+    borderRadius: 24,
+    padding: 3,
+    borderWidth: 1,
+  },
+  dayTabItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
+  dayTabItemActive: {
+    backgroundColor: '#0084FF',
+  },
+  dayTabText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#8B949E',
+  },
+  dayTabTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+
   colLocation: {
     minWidth: 140,
     flex: 1.4,
     paddingRight: 6,
   },
-  colDate: {
-    minWidth: 105,
+  colRegDate: {
+    minWidth: 140,
+    flex: 1.4,
+    paddingRight: 6,
+  },
+  colDeliveryDate: {
+    minWidth: 100,
     flex: 1,
     paddingRight: 6,
+  },
+  colDays: {
+    minWidth: 85,
+    flex: 0.8,
+    paddingRight: 6,
+  },
+  regDateText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#38BDF8',
   },
   colOperator: {
     minWidth: 110,

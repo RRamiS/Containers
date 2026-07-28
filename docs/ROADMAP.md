@@ -71,6 +71,7 @@ Plantilla de ítem:
 
 ## Hecho recientemente (referencia)
 
+- [x] **Pantalla de Login y Autenticación** — Selector de perfil (Admin vs Choferes), admin único (`federico`), asignación de usuario/clave a choferes en el CRUD, persistencia de sesión y guard de rutas.
 - Modelo de gestión por **Stock de Contenedores** (sin IDs individuales) y diferenciación de contenedores **Fijos** vs **Temporales**.
 - Estados de stock: En depósito, En cliente, En tránsito y Fijos.
 - App Expo + Tauri, CRUDs alquileres/activos/choferes

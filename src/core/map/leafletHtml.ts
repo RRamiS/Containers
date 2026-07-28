@@ -70,6 +70,9 @@ export function buildLeafletHtml(options: {
     markers.forEach((m) => {
       const marker = L.marker([m.lat, m.lng], { icon: colorIcon(m.color, m.badgeText) }).addTo(map);
       if (m.label) marker.bindPopup(m.label);
+      if (markers.length === 1) {
+        marker.openPopup();
+      }
     });
 
     let selectedMarker = null;
@@ -112,11 +115,8 @@ export function buildLeafletHtml(options: {
 
     ${
       lockCenter
-        ? `
-    // Mantener vista centrada en San Luis al cargar
-    map.setView(defaultCenter, ${zoom});
-    `
-        : ''
+        ? `map.setView(defaultCenter, ${zoom});`
+        : `map.setView([${center.lat}, ${center.lng}], ${zoom});`
     }
 
     setTimeout(() => map.invalidateSize(), 200);

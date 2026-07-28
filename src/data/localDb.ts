@@ -47,7 +47,27 @@ export const localDb = {
     },
   },
   operators: {
-    list: () => read<Operator>(KEYS.operators),
+    list: async () => {
+      const items = await read<Operator>(KEYS.operators);
+      if (items.length === 0) {
+        const initial: Operator[] = [
+          {
+            id: 'op-1',
+            full_name: 'Carlos Chofer',
+            phone: '2664001122',
+            license: 'ABC-12345',
+            username: 'chofer1',
+            password: '123456',
+            active: true,
+            created_at: nowIso(),
+            updated_at: nowIso(),
+          },
+        ];
+        await write(KEYS.operators, initial);
+        return initial;
+      }
+      return items;
+    },
     save: (items: Operator[]) => write(KEYS.operators, items),
   },
   rentals: {

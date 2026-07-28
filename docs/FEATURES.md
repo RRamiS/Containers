@@ -105,7 +105,9 @@ Alta, edición y eliminación de personas que entregan/retiran.
 | Nombre completo | Obligatorio |
 | Teléfono | Opcional |
 | Licencia | Opcional |
-| Activo | Si está inactivo, no se ofrece en altas nuevas |
+| Usuario (Login) | Asignado por el Admin para permitir acceso al Chofer |
+| Contraseña | Clave de acceso para el Chofer |
+| Activo | Si está inactivo, no se ofrece en altas nuevas ni permite login |
 
 Se usan como relaciones en alquileres (`delivery_operator_id`, `pickup_operator_id`).
 
@@ -208,6 +210,27 @@ Limitaciones actuales:
 
 ---
 
+## 10. Login y Autenticación (Admin / Choferes) — `done`
+
+**Dónde:** ruta `/login` (`app/login.tsx`) · `src/features/auth/LoginScreen.tsx` · `src/core/auth/AuthContext.tsx`
+
+- **Pantalla de Inicio de Sesión (`/login`)**:
+  - Selector superior de rol: **Admin** vs **Choferes** en contenedor/card con estética oscura minimalista.
+  - Campos: **Usuario *** y **Password *** con subtexto de validación y estrellas rojas indicativas.
+  - Botones de acción: Botón pill azul **`✓ Submit`** y botón pill gris **`Reset`** para limpiar inputs.
+- **Administrador Único (Admin)**:
+  - Usuario predeterminado: **`federico`** (contraseña: `123456` o `Admin123!`).
+  - Acceso completo a toda la suite de administración (Operaciones Diarias, Mapa, Estadísticas y Choferes).
+- **Choferes / Operadores**:
+  - El Administrador asigna **Usuario** y **Contraseña** a cada chofer desde el CRUD de Choferes (`OperatorFormScreen.tsx`).
+  - Los choferes pueden loguearse con su usuario y contraseña asignados.
+- **Gestión de Sesión & Guard de Rutas**:
+  - `AuthProvider` centralizado con almacenamiento persistente en `AsyncStorage`.
+  - Redirección automática a `/login` para usuarios no autenticados.
+  - Cierre de sesión (`Logout`) integrado en el modal de perfil de la barra superior.
+
+---
+
 ## Matriz rápida
 
 | Feature | Estado | Escalable vía |
@@ -215,10 +238,11 @@ Limitaciones actuales:
 | Operaciones Diarias (Alquileres CRUD) | done | `features/rentals` + config |
 | Contenedores Stock & Fijos | done | `features/assets` + `fixedContainersRepo` |
 | Estadísticas & Transacciones | done | `features/stats` |
-| Choferes CRUD | done | `features/operators` |
+| Choferes CRUD + Credenciales | done | `features/operators` |
 | Mapa + filtros | done | `features/map-overview` + config estados |
 | Export CSV | done | `features/exports` |
 | Barra Flotante Pill | done | `app/(tabs)/_layout.tsx` |
 | Multi-rubro | done | `config/industry/*` |
-| Auth | planned | Supabase Auth + UI |
+| Auth & Pantalla Login (Admin / Choferes) | done | `src/core/auth` + `features/auth` |
+
 | Storage recibos | planned | bucket `attachments` |

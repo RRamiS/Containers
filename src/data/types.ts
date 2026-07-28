@@ -37,6 +37,8 @@ export type Operator = {
   full_name: string;
   phone: string;
   license: string;
+  username?: string;
+  password?: string;
   active: boolean;
   created_at: string;
   updated_at: string;

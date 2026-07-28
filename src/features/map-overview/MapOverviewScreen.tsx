@@ -312,55 +312,61 @@ export function MapOverviewScreen() {
 
   // Marcadores de Geolocalización para el Mapa con Paleta Unificada
   const markers: MapMarker[] = useMemo(() => {
-    // 1. Pin de Depósito Principal (Amarillo #F59E0B) con el número exacto de contenedores en depósito
-    const depotMarker: MapMarker = {
-      id: DEPOT_LOCATION.id,
-      lat: DEPOT_LOCATION.lat,
-      lng: DEPOT_LOCATION.lng,
-      label: `🏢 [DEPÓSITO SAN LUIS] Av. Sarmiento · ${availableAssetsCount} contenedores en depósito`,
-      color: '#F59E0B',
-      badgeText: String(availableAssetsCount),
-    };
+    const showDepot = status === 'all' || status === 'deposito';
+    const showFixed = status === 'all' || status === 'fijo';
+    const showRentals = status === 'all' || status === 'activo' || status === 'entregado';
+
+    // 1. Pin de Depósito Principal (Amarillo #F59E0B)
+    const depotMarker: MapMarker | null = showDepot
+      ? {
+          id: DEPOT_LOCATION.id,
+          lat: DEPOT_LOCATION.lat,
+          lng: DEPOT_LOCATION.lng,
+          label: `🏢 [DEPÓSITO SAN LUIS] Av. Sarmiento · ${availableAssetsCount} contenedores en depósito`,
+          color: '#F59E0B',
+          badgeText: String(availableAssetsCount),
+        }
+      : null;
 
     // 2. Alquileres Temporales con Coordenadas (Activos = Verde #16A34A | En tránsito = Celeste #0EA5E9)
-    const rentalMarkers: MapMarker[] = rentals
-      .filter((r) => r.lat != null && r.lng != null)
-      .filter((r) => {
-        if (status === 'fijo') return false;
-        if (status === 'entregado') return r.status === 'entregado' || r.status === 'activo';
-        return true;
-      })
-      .map((item) => {
-        const isTransit =
-          item.status === 'en_transito' ||
-          item.status === 'en_proceso' ||
-          item.status === 'pendiente_entrega' ||
-          item.status === 'pendiente_retiro';
-        const st = industry.rentalStatuses.find((s) => s.value === item.status);
-        return {
-          id: `rental-${item.id}`,
-          lat: item.lat as number,
-          lng: item.lng as number,
-          label: `${item.client_name} · ${st?.label ?? item.status}`,
-          color: isTransit ? '#0EA5E9' : '#16A34A', // Celeste para tránsito, Verde para activos/entregados
-        };
-      });
+    const rentalMarkers: MapMarker[] = showRentals
+      ? rentals
+          .filter((r) => r.lat != null && r.lng != null)
+          .map((item) => {
+            const isTransit =
+              item.status === 'en_transito' ||
+              item.status === 'en_proceso' ||
+              item.status === 'pendiente_entrega' ||
+              item.status === 'pendiente_retiro';
+            const st = industry.rentalStatuses.find((s) => s.value === item.status);
+            return {
+              id: `rental-${item.id}`,
+              lat: item.lat as number,
+              lng: item.lng as number,
+              label: `${item.client_name} · ${st?.label ?? item.status}`,
+              color: isTransit ? '#0EA5E9' : '#16A34A', // Celeste para tránsito, Verde para activos/entregados
+            };
+          })
+      : [];
 
     // 3. Contenedores Fijos (Azul #2563EB)
-    const fixedMarkers: MapMarker[] =
-      status === 'all' || status === 'fijo'
-        ? fixedContainers
-            .filter((f) => f.lat != null && f.lng != null)
-            .map((f) => ({
-              id: `fixed-${f.id}`,
-              lat: f.lat as number,
-              lng: f.lng as number,
-              label: `[FIJO] ${f.client_name} · ${f.address || 'Sin dirección'}`,
-              color: '#2563EB', // Azul para fijos
-            }))
-        : [];
+    const fixedMarkers: MapMarker[] = showFixed
+      ? fixedContainers
+          .filter((f) => f.lat != null && f.lng != null)
+          .map((f) => ({
+            id: `fixed-${f.id}`,
+            lat: f.lat as number,
+            lng: f.lng as number,
+            label: `[FIJO] ${f.client_name} · ${f.address || 'Sin dirección'}`,
+            color: '#2563EB', // Azul para fijos
+          }))
+      : [];
 
-    return [depotMarker, ...rentalMarkers, ...fixedMarkers];
+    return [
+      ...(depotMarker ? [depotMarker] : []),
+      ...rentalMarkers,
+      ...fixedMarkers,
+    ];
   }, [rentals, fixedContainers, availableAssetsCount, status]);
 
   return (

@@ -1,11 +1,38 @@
 import 'react-native-gesture-handler';
-import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { ActivityIndicator, Platform, View } from 'react-native';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { label } from '@/config/industry';
+import { AuthProvider, useAuth } from '@/core/auth/AuthContext';
 import { ThemeProvider, useTheme } from '@/core/theme/ThemeContext';
+import { ToastProvider } from '@/core/ui/ToastContext';
 
-import { useEffect } from 'react';
-import { Platform } from 'react-native';
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+    const inLoginRoute = segments[0] === 'login';
+    if (!isAuthenticated && !inLoginRoute) {
+      router.replace('/login');
+    } else if (isAuthenticated && inLoginRoute) {
+      router.replace('/');
+    }
+  }, [isAuthenticated, isLoading, segments, router]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D1117' }}>
+        <ActivityIndicator size="large" color="#0084FF" />
+      </View>
+    );
+  }
+
+  return <>{children}</>;
+}
 
 function MainStack() {
   const { mode, theme } = useTheme();
@@ -23,13 +50,11 @@ function MainStack() {
       const thumbHoverColor = mode === 'dark' ? 'rgba(142, 160, 181, 0.5)' : 'rgba(100, 116, 139, 0.5)';
 
       styleEl.innerHTML = `
-        /* Eliminar bordes azules de foco por defecto en web */
         *:focus, *:focus-visible, button:focus, input:focus, select:focus {
           outline: none !important;
           box-shadow: none !important;
         }
 
-        /* Barra de Desplazamiento Estilizada y Minimalista */
         ::-webkit-scrollbar {
           width: 7px;
           height: 7px;
@@ -55,54 +80,48 @@ function MainStack() {
   return (
     <>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="assets/[id]"
-          options={{
-            headerShown: true,
-            title: label('asset'),
-            headerStyle: { backgroundColor: theme.surface },
-            headerTintColor: theme.text,
-          }}
-        />
-        <Stack.Screen
-          name="operators/[id]"
-          options={{
-            headerShown: true,
-            title: label('operator'),
-            headerStyle: { backgroundColor: theme.surface },
-            headerTintColor: theme.text,
-          }}
-        />
-        <Stack.Screen
-          name="assets/[id]"
-          options={{
-            headerShown: false,
-            presentation: 'transparentModal',
-            animation: 'fade',
-          }}
-        />
-        <Stack.Screen
-          name="rentals/[id]"
-          options={{
-            headerShown: false,
-            presentation: 'transparentModal',
-            animation: 'fade',
-          }}
-        />
-      </Stack>
+      <AuthGuard>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="login" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen
+            name="operators/[id]"
+            options={{
+              headerShown: true,
+              title: label('operator'),
+              headerStyle: { backgroundColor: theme.surface },
+              headerTintColor: theme.text,
+            }}
+          />
+          <Stack.Screen
+            name="assets/[id]"
+            options={{
+              headerShown: false,
+              presentation: 'transparentModal',
+              animation: 'fade',
+            }}
+          />
+          <Stack.Screen
+            name="rentals/[id]"
+            options={{
+              headerShown: false,
+              presentation: 'transparentModal',
+              animation: 'fade',
+            }}
+          />
+        </Stack>
+      </AuthGuard>
     </>
   );
 }
-
-import { ToastProvider } from '@/core/ui/ToastContext';
 
 export default function RootLayout() {
   return (
     <ThemeProvider>
       <ToastProvider>
-        <MainStack />
+        <AuthProvider>
+          <MainStack />
+        </AuthProvider>
       </ToastProvider>
     </ThemeProvider>
   );

@@ -1,19 +1,25 @@
 import { useState } from 'react';
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../theme/ThemeContext';
-
 import { toast } from '../ui/ToastContext';
 
 export function ProfileButton() {
   const [modalVisible, setModalVisible] = useState(false);
   const { mode, theme } = useTheme();
+  const { user, logout } = useAuth();
   const isDark = mode === 'dark';
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setModalVisible(false);
+    await logout();
     toast.info('Sesión cerrada', 'Has salido del sistema de contenedores correctamente.');
   };
+
+  const displayName = user?.name || 'Federico';
+  const roleLabel = user?.role === 'admin' ? 'Administrador' : 'Chofer';
+  const usernameText = user?.username ? `@${user.username}` : 'usuario';
 
   return (
     <>
@@ -49,7 +55,7 @@ export function ProfileButton() {
             ]}
             onPress={(e) => e.stopPropagation()}
           >
-            {/* Header del Modal con Ícono Top Left y Cerrar Top Right (Imagen 3) */}
+            {/* Header del Modal */}
             <View style={styles.modalHeader}>
               <View
                 style={[
@@ -75,32 +81,20 @@ export function ProfileButton() {
             <View style={styles.userInfoSection}>
               <View style={styles.nameRow}>
                 <Text style={[styles.userNameText, { color: theme.text }]}>
-                  Emiliano Romero
+                  {displayName}
                 </Text>
                 <View style={styles.roleBadge}>
-                  <Text style={styles.roleBadgeText}>Administrador</Text>
+                  <Text style={styles.roleBadgeText}>{roleLabel}</Text>
                 </View>
               </View>
 
               <Text style={[styles.userEmailText, { color: theme.textMuted }]}>
-                Util Romero Containers · admin@utilromero.com
+                Util Romero Containers · {usernameText}
               </Text>
             </View>
 
-            {/* Fila de Botones (Estilo Imagen 3: Close y Primary Action) */}
+            {/* Acciones */}
             <View style={styles.modalActionsRow}>
-              <Pressable
-                style={[
-                  styles.secondaryBtn,
-                  { backgroundColor: isDark ? '#242C37' : '#E2E8F0' },
-                ]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={[styles.secondaryBtnText, { color: theme.text }]}>
-                  Cerrar
-                </Text>
-              </Pressable>
-
               <Pressable style={styles.primaryBtn} onPress={handleLogout}>
                 <Text style={styles.primaryBtnText}>Cerrar Sesión</Text>
               </Pressable>
