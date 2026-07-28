@@ -19,6 +19,7 @@ Repo: https://github.com/RRamiS/Containers
 | **[docs/FEATURES.md](./docs/FEATURES.md)** | Funcionalidades **hechas**, cómo funcionan y limitaciones |
 | **[docs/ROADMAP.md](./docs/ROADMAP.md)** | Ideas futuras, prioridades y backlog vivo |
 | **[docs/ADDING_FEATURES.md](./docs/ADDING_FEATURES.md)** | Cómo agregar features sin romper la arquitectura escalable |
+| **[docs/MOBILE_BUILD.md](./docs/MOBILE_BUILD.md)** | Cómo probar / buildear la app para el **celular** (Expo Go + EAS) |
 
 Flujo recomendado entre colaboradores:
 
