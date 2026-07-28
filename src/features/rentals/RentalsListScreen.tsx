@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import {
+  addDays,
   addMonths,
   eachDayOfInterval,
   endOfMonth,
@@ -428,8 +429,140 @@ function DarkDateRangePicker({
 }
 
 // ==========================================
+// Calendario compacto para elegir un día fuera de los 3 chips
+// ==========================================
+function DayCalendarButton({
+  selectedDate,
+  onSelectDate,
+  active,
+}: {
+  selectedDate: string | null;
+  onSelectDate: (dateStr: string) => void;
+  active: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(() =>
+    selectedDate ? parseISO(selectedDate) : new Date(),
+  );
+  const { mode, theme } = useTheme();
+  const isDark = mode === 'dark';
+
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const startDayOfWeek = (monthStart.getDay() + 6) % 7;
+  const emptyPrefixDays = Array.from({ length: startDayOfWeek });
+
+  return (
+    <View style={[styles.dayCalendarWrap, open && { zIndex: 10000 }]}>
+      <PressableMotion
+        pressScale={0.96}
+        hoverScale={1.04}
+        hoverShadow
+        onPress={() => setOpen(!open)}
+        contentStyle={[
+          styles.dayCalendarBtn,
+          {
+            backgroundColor: active ? '#0084FF' : 'transparent',
+            borderColor: 'transparent',
+          },
+        ]}
+      >
+        <Feather name="calendar" size={15} color={active ? '#FFFFFF' : theme.textMuted} />
+        {active && selectedDate ? (
+          <Text style={styles.dayCalendarBtnTextActive}>
+            {format(parseISO(selectedDate), 'dd MMM', { locale: es })}
+          </Text>
+        ) : null}
+      </PressableMotion>
+
+      {open ? <Pressable style={styles.popoverBackdrop} onPress={() => setOpen(false)} /> : null}
+
+      <DropdownReveal open={open} style={styles.dayCalendarPopoverWrap}>
+        <View
+          style={[
+            styles.dayCalendarPopover,
+            {
+              backgroundColor: theme.surface,
+              borderColor: theme.surfaceBorder,
+              ...(Platform.OS === 'web'
+                ? ({
+                    boxShadow: isDark
+                      ? '0 18px 48px rgba(0,0,0,0.65)'
+                      : '0 16px 40px rgba(15,23,42,0.16)',
+                  } as object)
+                : {
+                    shadowColor: '#000',
+                    shadowOpacity: 0.35,
+                    shadowRadius: 16,
+                    shadowOffset: { width: 0, height: 10 },
+                    elevation: 12,
+                  }),
+            },
+          ]}
+        >
+          <View style={styles.monthHeader}>
+            <Text style={[styles.monthTitle, { color: theme.text }]}>
+              {format(currentMonth, 'MMMM yyyy', { locale: es })}
+            </Text>
+            <View style={styles.monthNavBtns}>
+              <Pressable onPress={() => setCurrentMonth(subMonths(currentMonth, 1))} style={styles.navBtn}>
+                <Feather name="chevron-left" size={16} color={theme.textMuted} />
+              </Pressable>
+              <Pressable onPress={() => setCurrentMonth(addMonths(currentMonth, 1))} style={styles.navBtn}>
+                <Feather name="chevron-right" size={16} color={theme.textMuted} />
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.weekDaysRow}>
+            {['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map((d) => (
+              <Text key={d} style={styles.weekDayText}>
+                {d}
+              </Text>
+            ))}
+          </View>
+
+          <View style={styles.daysGrid}>
+            {emptyPrefixDays.map((_, i) => (
+              <View key={`empty-${i}`} style={styles.dayCellEmpty} />
+            ))}
+            {daysInMonth.map((day) => {
+              const dayStr = format(day, 'yyyy-MM-dd');
+              const isSelected = selectedDate === dayStr;
+              return (
+                <Pressable
+                  key={dayStr}
+                  style={[styles.dayCell, isSelected && styles.dayCellSelected]}
+                  onPress={() => {
+                    onSelectDate(dayStr);
+                    setOpen(false);
+                  }}
+                >
+                  <Text style={[styles.dayText, { color: isSelected ? '#FFFFFF' : theme.text }]}>
+                    {format(day, 'd')}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </DropdownReveal>
+    </View>
+  );
+}
+
+// ==========================================
 // Pantalla Principal: RentalsListScreen (Operaciones Diarias)
 // ==========================================
+type OpsMode = 'entrega' | 'retiro' | 'recambio';
+
+function getOpsDate(r: RentalWithRelations, mode: OpsMode): string {
+  // Entrega → fecha de entrega (start_date)
+  // Retiro / Recambio → fecha de retiro (end_date)
+  if (mode === 'entrega') return r.start_date;
+  return r.end_date;
+}
 export function RentalsListScreen() {
   const router = useRouter();
   const { mode, theme } = useTheme();
@@ -515,60 +648,47 @@ export function RentalsListScreen() {
     }
   };
 
-  // Filtro de Pestañas por Día (Hoy, Mañana, Días futuros con eventos hasta 7 max)
+  // Modo de operación + pestañas por día (3 días + calendario)
+  const [opsMode, setOpsMode] = useState<OpsMode>('entrega');
   const [selectedDayTab, setSelectedDayTab] = useState<string>('all');
+
+  const quickDayKeys = useMemo(() => {
+    const today = new Date();
+    return [0, 1, 2].map((offset) => format(addDays(today, offset), 'yyyy-MM-dd'));
+  }, [rentals.length]); // se refresca al cargar datos
 
   const dayTabOptions = useMemo(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
-    const dateMap = new Map<string, { count: number; dateObj: Date }>();
-
+    const counts = new Map<string, number>();
     rentals.forEach((r) => {
-      if (r.start_date) {
-        const c = dateMap.get(r.start_date)?.count || 0;
-        try {
-          dateMap.set(r.start_date, { count: c + 1, dateObj: parseISO(r.start_date) });
-        } catch {}
-      }
-      if (r.end_date) {
-        const c = dateMap.get(r.end_date)?.count || 0;
-        try {
-          dateMap.set(r.end_date, { count: c + 1, dateObj: parseISO(r.end_date) });
-        } catch {}
-      }
+      const d = getOpsDate(r, opsMode);
+      if (!d) return;
+      counts.set(d, (counts.get(d) || 0) + 1);
     });
 
-    if (!dateMap.has(today)) {
-      dateMap.set(today, { count: 0, dateObj: new Date() });
-    }
-
-    const sortedDates = Array.from(dateMap.keys()).sort((a, b) => a.localeCompare(b));
-    // Limitar a máximo 7 fechas relevantes
-    const max7Dates = sortedDates.slice(0, 7);
+    const totalForMode = rentals.length;
 
     return [
-      { value: 'all', label: `Todos (${rentals.length})` },
-      ...max7Dates.map((d) => {
+      { value: 'all', label: `Todos (${totalForMode})` },
+      ...quickDayKeys.map((d) => {
+        const count = counts.get(d) || 0;
         const isToday = d === today;
-        const count = dateMap.get(d)?.count || 0;
-        let dayLabel = isToday ? 'Hoy' : format(parseISO(d), 'dd MMM', { locale: es });
-        if (isToday) {
-          dayLabel = `Hoy (${format(new Date(), 'dd MMM', { locale: es })})`;
-        }
-        return {
-          value: d,
-          label: `${dayLabel} (${count})`,
-        };
+        const dayLabel = isToday
+          ? `Hoy (${format(parseISO(d), 'dd MMM', { locale: es })})`
+          : format(parseISO(d), 'dd MMM', { locale: es });
+        return { value: d, label: `${dayLabel} (${count})` };
       }),
     ];
-  }, [rentals]);
+  }, [rentals, opsMode, quickDayKeys]);
+
+  const isCalendarDayActive =
+    selectedDayTab !== 'all' && !quickDayKeys.includes(selectedDayTab);
 
   // Filtrado Multicriterio
   const filteredRentals = useMemo(() => {
     return rentals.filter((r) => {
       if (selectedDayTab !== 'all') {
-        if (r.start_date !== selectedDayTab && r.end_date !== selectedDayTab) {
-          return false;
-        }
+        if (getOpsDate(r, opsMode) !== selectedDayTab) return false;
       }
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
       if (paymentFilter !== 'all' && (r.payment_status || 'pendiente') !== paymentFilter) return false;
@@ -588,48 +708,82 @@ export function RentalsListScreen() {
       }
       return true;
     });
-  }, [rentals, selectedDayTab, statusFilter, paymentFilter, operatorFilter, startDateFilter, endDateFilter, searchQuery]);
+  }, [rentals, opsMode, selectedDayTab, statusFilter, paymentFilter, operatorFilter, startDateFilter, endDateFilter, searchQuery]);
 
   return (
     <Screen loading={loading}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Barra de Pestañas por Día (Hoy, Mañana, Días futuros con eventos hasta 7 max) */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.dayTabsScrollContainer}
+        {/* Pestañas de operación: Entrega / Retiro / Recambio */}
+        <View
+          style={[
+            styles.opsModePill,
+            { backgroundColor: isDark ? '#161B22' : '#EFF2F5', borderColor: theme.surfaceBorder },
+          ]}
         >
-          <View
-            style={[
-              styles.dayTabsSegmentedPill,
-              { backgroundColor: isDark ? '#161B22' : '#EFF2F5', borderColor: theme.surfaceBorder },
-            ]}
-          >
-            {dayTabOptions.map((tab) => {
-              const isActive = selectedDayTab === tab.value;
-              return (
-                <PressableMotion
-                  key={tab.value}
-                  pressScale={0.97}
-                  hoverScale={1.03}
-                  hoverShadow={!isActive}
-                  onPress={() => setSelectedDayTab(tab.value)}
-                  contentStyle={[
-                    styles.dayTabItem,
-                    isActive && styles.dayTabItemActive,
-                    !isActive && Platform.OS === 'web'
-                      ? ({ transition: 'background-color 140ms ease' } as object)
-                      : null,
-                  ]}
-                >
-                  <Text style={[styles.dayTabText, isActive && styles.dayTabTextActive]}>
-                    {tab.label}
-                  </Text>
-                </PressableMotion>
-              );
-            })}
-          </View>
-        </ScrollView>
+          {(
+            [
+              { value: 'entrega' as const, label: 'Entrega' },
+              { value: 'retiro' as const, label: 'Retiro' },
+              { value: 'recambio' as const, label: 'Recambio' },
+            ] as const
+          ).map((tab) => {
+            const isActive = opsMode === tab.value;
+            return (
+              <PressableMotion
+                key={tab.value}
+                pressScale={0.97}
+                hoverScale={1.03}
+                hoverShadow={!isActive}
+                onPress={() => {
+                  setOpsMode(tab.value);
+                  setSelectedDayTab('all');
+                }}
+                contentStyle={[styles.dayTabItem, isActive && styles.dayTabItemActive]}
+              >
+                <Text style={[styles.dayTabText, isActive && styles.dayTabTextActive]}>{tab.label}</Text>
+              </PressableMotion>
+            );
+          })}
+        </View>
+
+        {/* Pestañas por día (Hoy + 2 días) + calendario pegado a la derecha */}
+        <View
+          style={[
+            styles.dayTabsSegmentedPill,
+            styles.dayTabsRow,
+            { backgroundColor: isDark ? '#161B22' : '#EFF2F5', borderColor: theme.surfaceBorder },
+          ]}
+        >
+          {dayTabOptions.map((tab) => {
+            const isActive = selectedDayTab === tab.value;
+            return (
+              <PressableMotion
+                key={tab.value}
+                pressScale={0.97}
+                hoverScale={1.03}
+                hoverShadow={!isActive}
+                onPress={() => setSelectedDayTab(tab.value)}
+                contentStyle={[
+                  styles.dayTabItem,
+                  isActive && styles.dayTabItemActive,
+                  !isActive && Platform.OS === 'web'
+                    ? ({ transition: 'background-color 140ms ease' } as object)
+                    : null,
+                ]}
+              >
+                <Text style={[styles.dayTabText, isActive && styles.dayTabTextActive]}>
+                  {tab.label}
+                </Text>
+              </PressableMotion>
+            );
+          })}
+
+          <DayCalendarButton
+            selectedDate={isCalendarDayActive ? selectedDayTab : null}
+            active={isCalendarDayActive}
+            onSelectDate={(d) => setSelectedDayTab(d)}
+          />
+        </View>
 
         {/* Toolbar Superior: Filtros Flotantes y Buscador Pill */}
         <View style={styles.floatingToolbar}>
@@ -736,7 +890,9 @@ export function RentalsListScreen() {
                 <Text style={[styles.headerCell, styles.colClient, { color: theme.textMuted }]}>Cliente</Text>
                 <Text style={[styles.headerCell, styles.colLocation, { color: theme.textMuted }]}>Ubicación</Text>
                 <Text style={[styles.headerCell, styles.colRegDate, { color: theme.textMuted }]}>Fecha Registro</Text>
-                <Text style={[styles.headerCell, styles.colDeliveryDate, { color: theme.textMuted }]}>Fecha Entrega</Text>
+                <Text style={[styles.headerCell, styles.colDeliveryDate, { color: theme.textMuted }]}>
+                  {opsMode === 'entrega' ? 'Fecha Entrega' : 'Fecha Retiro'}
+                </Text>
                 <Text style={[styles.headerCell, styles.colDays, { color: theme.textMuted }]}>Días Alquiler</Text>
                 <Text style={[styles.headerCell, styles.colOperator, { color: theme.textMuted }]}>Chofer</Text>
                 <Text style={[styles.headerCell, styles.colAmount, { color: theme.textMuted }]}>Monto Total ($)</Text>
@@ -832,10 +988,10 @@ export function RentalsListScreen() {
                           </Text>
                         </View>
 
-                        {/* 5. Fecha Entrega (Sin hora: YYYY-MM-DD) */}
+                        {/* 5. Fecha relevante según pestaña de operación */}
                         <View style={styles.colDeliveryDate}>
                           <Text style={[styles.cellText, { color: theme.text }]} numberOfLines={1}>
-                            {formatDateOnly(item.start_date)}
+                            {formatDateOnly(getOpsDate(item, opsMode))}
                           </Text>
                         </View>
 
@@ -1287,15 +1443,60 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  /* Pestañas por Día */
-  dayTabsScrollContainer: {
-    paddingBottom: 4,
+  /* Pestañas de operación + días */
+  opsModePill: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    borderRadius: 24,
+    padding: 3,
+    borderWidth: 1,
+    marginBottom: 10,
+  },
+  dayTabsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    marginBottom: 4,
+    zIndex: 120,
   },
   dayTabsSegmentedPill: {
     flexDirection: 'row',
     borderRadius: 24,
     padding: 3,
     borderWidth: 1,
+  },
+  dayCalendarWrap: {
+    position: 'relative',
+  },
+  dayCalendarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 32,
+    minWidth: 32,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    borderWidth: 0,
+    justifyContent: 'center',
+  },
+  dayCalendarBtnTextActive: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dayCalendarPopoverWrap: {
+    position: 'absolute',
+    top: 42,
+    left: 0,
+    zIndex: 10001,
+    elevation: 10001,
+  },
+  dayCalendarPopover: {
+    width: 290,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 14,
   },
   dayTabItem: {
     paddingHorizontal: 16,

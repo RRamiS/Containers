@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { industry } from '@/config/industry';
 import type { RentalWithRelations } from '@/data/types';
 import { useTheme } from '@/core/theme/ThemeContext';
+import { handleOpenReceipt } from '@/features/rentals/openReceipt';
 
 export function RentalDetailsModal({
   visible,
@@ -176,16 +177,32 @@ export function RentalDetailsModal({
                     <Text style={[styles.detailLabel, { color: theme.textMuted, marginBottom: 6 }]}>
                       Comprobante de Recibo:
                     </Text>
-                    {rental.receipt_uri.startsWith('data:image') ||
-                    rental.receipt_uri.startsWith('http') ||
-                    rental.receipt_uri.startsWith('file') ? (
-                      <Image source={{ uri: rental.receipt_uri }} style={styles.receiptPreviewImage} resizeMode="cover" />
-                    ) : (
-                      <View style={styles.receiptFileBadge}>
-                        <Feather name="paperclip" size={14} color="#0084FF" style={{ marginRight: 6 }} />
-                        <Text style={styles.receiptFileName}>{rental.receipt_name || 'Comprobante adjunto'}</Text>
-                      </View>
-                    )}
+                    <Pressable
+                      onPress={() => void handleOpenReceipt(rental.receipt_uri, rental.receipt_name)}
+                      style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+                    >
+                      {rental.receipt_uri.startsWith('data:image') ||
+                      rental.receipt_uri.startsWith('http') ||
+                      (rental.receipt_uri.startsWith('file') &&
+                        /\.(jpg|jpeg|png|webp|gif)$/i.test(rental.receipt_name || '')) ? (
+                        <Image
+                          source={{ uri: rental.receipt_uri }}
+                          style={styles.receiptPreviewImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={styles.receiptFileBadge}>
+                          <Feather name="download" size={14} color="#22C55E" style={{ marginRight: 6 }} />
+                          <Text style={styles.receiptFileName}>
+                            {rental.receipt_name || 'Comprobante adjunto'}
+                          </Text>
+                          <Feather name="external-link" size={13} color="#0084FF" style={{ marginLeft: 8 }} />
+                        </View>
+                      )}
+                      <Text style={[styles.openReceiptHint, { color: '#0084FF' }]}>
+                        Tocá para abrir / descargar
+                      </Text>
+                    </Pressable>
                   </View>
                 ) : null}
               </View>
@@ -362,6 +379,11 @@ const styles = StyleSheet.create({
   receiptFileName: {
     color: '#0084FF',
     fontSize: 13,
+    fontWeight: '600',
+  },
+  openReceiptHint: {
+    marginTop: 8,
+    fontSize: 12,
     fontWeight: '600',
   },
   modalFooter: {

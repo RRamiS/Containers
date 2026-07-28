@@ -1,34 +1,39 @@
 import 'react-native-gesture-handler';
-import { useEffect } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { label } from '@/config/industry';
 import { AuthProvider, useAuth } from '@/core/auth/AuthContext';
 import { ThemeProvider, useTheme } from '@/core/theme/ThemeContext';
 import { ToastProvider } from '@/core/ui/ToastContext';
+import { BrandSplashScreen } from '@/core/ui/BrandSplashScreen';
+
+const MIN_SPLASH_MS = 2200;
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
-    if (isLoading) return;
+    const t = setTimeout(() => setSplashDone(true), MIN_SPLASH_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (isLoading || !splashDone) return;
     const inLoginRoute = segments[0] === 'login';
     if (!isAuthenticated && !inLoginRoute) {
       router.replace('/login');
     } else if (isAuthenticated && inLoginRoute) {
       router.replace('/');
     }
-  }, [isAuthenticated, isLoading, segments, router]);
+  }, [isAuthenticated, isLoading, splashDone, segments, router]);
 
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0D1117' }}>
-        <ActivityIndicator size="large" color="#0084FF" />
-      </View>
-    );
+  if (isLoading || !splashDone) {
+    return <BrandSplashScreen holding={isLoading} />;
   }
 
   return <>{children}</>;
