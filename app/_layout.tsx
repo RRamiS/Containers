@@ -55,6 +55,15 @@ function MainStack() {
           box-shadow: none !important;
         }
 
+        button, [role="button"], a, .cursor-pointer {
+          transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 140ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 180ms ease !important;
+        }
+
+        /* Filas / cards clickeables en web */
+        [data-hoverable="true"]:hover {
+          filter: brightness(${mode === 'dark' ? '1.08' : '0.985'});
+        }
+
         ::-webkit-scrollbar {
           width: 7px;
           height: 7px;
@@ -72,6 +81,13 @@ function MainStack() {
         * {
           scrollbar-width: thin;
           scrollbar-color: ${thumbColor} transparent;
+        }
+
+        /* Light: fondo de página un poco más rico */
+        ${
+          mode === 'light'
+            ? `body, #root { background: #EEF2F7 !important; }`
+            : `body, #root { background: #0F1216 !important; }`
         }
       `;
     }

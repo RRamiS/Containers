@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,6 +31,8 @@ import { Button } from '@/core/ui/Button';
 import { alertMessage, confirmAction } from '@/core/ui/confirm';
 import { useTheme } from '@/core/theme/ThemeContext';
 import { toast } from '@/core/ui/ToastContext';
+import { PressableMotion } from '@/core/ui/PressableMotion';
+import { DropdownReveal, DropdownRevealItem } from '@/core/ui/Reveal';
 import { spacing } from '@/core/theme';
 
 function resolveId(value: string | string[] | undefined): string | undefined {
@@ -67,87 +70,102 @@ function SingleDatePickerField({
     <View style={[styles.fieldGroupFlex, { position: 'relative', zIndex: open ? 10000 : 1 }]}>
       <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{fieldLabelText}</Text>
       <View style={{ position: 'relative', zIndex: open ? 10000 : 1 }}>
-        <Pressable
-          style={({ pressed }) => [
+        <PressableMotion
+          pressScale={0.985}
+          hoverScale={1.01}
+          hoverShadow
+          onPress={() => setOpen(!open)}
+          contentStyle={[
             styles.datePickerInput,
             {
-              backgroundColor: pressed || open ? (isDark ? '#262D37' : '#E2E8F0') : (isDark ? '#161B22' : '#F8FAFC'),
+              backgroundColor: open ? (isDark ? '#1E2A3A' : '#EEF4FF') : isDark ? '#161B22' : '#F8FAFC',
               borderColor: open ? '#007AFF' : theme.surfaceBorder,
             },
           ]}
-          onPress={() => setOpen(!open)}
         >
           <Text style={[styles.dateInputText, { color: theme.text }]}>{formattedDisplay}</Text>
           <Feather name="calendar" size={16} color={theme.textMuted} />
-        </Pressable>
+        </PressableMotion>
 
-        {open ? (
-          <>
-            <Pressable style={styles.popoverBackdrop} onPress={() => setOpen(false)} />
-            <View
-              style={[
-                styles.singleCalendarPopover,
-                { backgroundColor: theme.surface, borderColor: theme.surfaceBorder },
-              ]}
-            >
-              <View style={styles.calendarMonthHeader}>
-                <Text style={[styles.calendarMonthTitle, { color: theme.text }]}>
-                  {format(currentMonth, 'MMMM yyyy', { locale: es })}
-                </Text>
-                <View style={styles.calendarNavRow}>
-                  <Pressable onPress={() => setCurrentMonth(subMonths(currentMonth, 1))} style={styles.calendarNavBtn}>
-                    <Feather name="chevron-left" size={16} color={theme.textMuted} />
-                  </Pressable>
-                  <Pressable onPress={() => setCurrentMonth(addMonths(currentMonth, 1))} style={styles.calendarNavBtn}>
-                    <Feather name="chevron-right" size={16} color={theme.textMuted} />
-                  </Pressable>
-                </View>
-              </View>
+        {open ? <Pressable style={styles.popoverBackdrop} onPress={() => setOpen(false)} /> : null}
 
-              <View style={styles.weekDaysRow}>
-                {['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map((d) => (
-                  <Text key={d} style={styles.weekDayText}>
-                    {d}
-                  </Text>
-                ))}
-              </View>
-
-              <View style={styles.daysGrid}>
-                {emptyPrefixDays.map((_, i) => (
-                  <View key={`empty-${i}`} style={styles.dayCellEmpty} />
-                ))}
-                {daysInMonth.map((day) => {
-                  const dayStr = format(day, 'yyyy-MM-dd');
-                  const isSelected = value === dayStr;
-                  return (
-                    <Pressable
-                      key={dayStr}
-                      style={[
-                        styles.dayCell,
-                        isSelected && styles.singleDayCellSelected,
-                      ]}
-                      onPress={() => {
-                        onChange(dayStr);
-                        setOpen(false);
-                      }}
-                    >
-                      <Text style={[styles.dayText, { color: isSelected ? '#FFFFFF' : theme.text }]}>
-                        {format(day, 'd')}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+        <DropdownReveal open={open} style={styles.singleCalendarPopoverWrap}>
+          <View
+            style={[
+              styles.singleCalendarPopover,
+              {
+                backgroundColor: theme.surface,
+                borderColor: theme.surfaceBorder,
+                ...(Platform.OS === 'web'
+                  ? ({
+                      boxShadow: isDark
+                        ? '0 18px 48px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,122,255,0.12)'
+                        : '0 16px 40px rgba(15,23,42,0.16), 0 0 0 1px rgba(0,122,255,0.08)',
+                    } as object)
+                  : {
+                      shadowColor: '#000',
+                      shadowOpacity: 0.35,
+                      shadowRadius: 14,
+                      shadowOffset: { width: 0, height: 10 },
+                      elevation: 12,
+                    }),
+              },
+            ]}
+          >
+            <View style={styles.calendarMonthHeader}>
+              <Text style={[styles.calendarMonthTitle, { color: theme.text }]}>
+                {format(currentMonth, 'MMMM yyyy', { locale: es })}
+              </Text>
+              <View style={styles.calendarNavRow}>
+                <Pressable onPress={() => setCurrentMonth(subMonths(currentMonth, 1))} style={styles.calendarNavBtn}>
+                  <Feather name="chevron-left" size={16} color={theme.textMuted} />
+                </Pressable>
+                <Pressable onPress={() => setCurrentMonth(addMonths(currentMonth, 1))} style={styles.calendarNavBtn}>
+                  <Feather name="chevron-right" size={16} color={theme.textMuted} />
+                </Pressable>
               </View>
             </View>
-          </>
-        ) : null}
+
+            <View style={styles.weekDaysRow}>
+              {['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map((d) => (
+                <Text key={d} style={styles.weekDayText}>
+                  {d}
+                </Text>
+              ))}
+            </View>
+
+            <View style={styles.daysGrid}>
+              {emptyPrefixDays.map((_, i) => (
+                <View key={`empty-${i}`} style={styles.dayCellEmpty} />
+              ))}
+              {daysInMonth.map((day) => {
+                const dayStr = format(day, 'yyyy-MM-dd');
+                const isSelected = value === dayStr;
+                return (
+                  <Pressable
+                    key={dayStr}
+                    style={[styles.dayCell, isSelected && styles.singleDayCellSelected]}
+                    onPress={() => {
+                      onChange(dayStr);
+                      setOpen(false);
+                    }}
+                  >
+                    <Text style={[styles.dayText, { color: isSelected ? '#FFFFFF' : theme.text }]}>
+                      {format(day, 'd')}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </DropdownReveal>
       </View>
     </View>
   );
 }
 
 // ==========================================
-// Componente 2: Stepper Input de Días (+ / -)
+// Componente 2: Stepper Input de Días (+ / -) — control unificado
 // ==========================================
 function DaysStepperField({
   label: fieldLabelText,
@@ -160,6 +178,7 @@ function DaysStepperField({
 }) {
   const { mode, theme } = useTheme();
   const isDark = mode === 'dark';
+  const [focused, setFocused] = useState(false);
 
   const handleDecrement = () => {
     if (value > 1) onChange(value - 1);
@@ -172,21 +191,41 @@ function DaysStepperField({
   return (
     <View style={styles.fieldGroupFlex}>
       <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{fieldLabelText}</Text>
-      <View style={styles.stepperContainer}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.stepperBtn,
-            { backgroundColor: pressed ? (isDark ? '#2B333E' : '#CBD5E1') : (isDark ? '#1C2128' : '#E2E8F0') },
-          ]}
+      <View
+        style={[
+          styles.stepperShell,
+          {
+            backgroundColor: isDark ? '#161B22' : '#F8FAFC',
+            borderColor: focused ? '#007AFF' : theme.surfaceBorder,
+          },
+          focused && Platform.OS === 'web'
+            ? ({ boxShadow: '0 0 0 3px rgba(0,122,255,0.18)' } as object)
+            : null,
+        ]}
+      >
+        <PressableMotion
+          pressScale={0.92}
+          hoverScale={1.06}
+          hoverShadow
           onPress={handleDecrement}
+          disabled={value <= 1}
+          contentStyle={[
+            styles.stepperCircleBtn,
+            {
+              backgroundColor: isDark ? '#243041' : '#E8F1FF',
+              opacity: value <= 1 ? 0.45 : 1,
+            },
+          ]}
         >
-          <Feather name="minus" size={16} color={theme.text} />
-        </Pressable>
+          <Feather name="minus" size={16} color="#007AFF" />
+        </PressableMotion>
 
-        <View style={[styles.stepperInputBox, { backgroundColor: isDark ? '#161B22' : '#F8FAFC', borderColor: '#007AFF' }]}>
+        <View style={styles.stepperValueWrap}>
           <TextInput
             style={[styles.stepperInputText, { color: theme.text }]}
             value={String(value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             onChangeText={(txt) => {
               const num = parseInt(txt, 10);
               if (!isNaN(num) && num > 0) onChange(num);
@@ -195,17 +234,20 @@ function DaysStepperField({
             keyboardType="number-pad"
             textAlign="center"
           />
+          <Text style={[styles.stepperUnit, { color: theme.textMuted }]}>
+            {value === 1 ? 'día' : 'días'}
+          </Text>
         </View>
 
-        <Pressable
-          style={({ pressed }) => [
-            styles.stepperBtn,
-            { backgroundColor: pressed ? (isDark ? '#2B333E' : '#CBD5E1') : (isDark ? '#1C2128' : '#E2E8F0') },
-          ]}
+        <PressableMotion
+          pressScale={0.92}
+          hoverScale={1.06}
+          hoverShadow
           onPress={handleIncrement}
+          contentStyle={[styles.stepperCircleBtn, { backgroundColor: '#007AFF' }]}
         >
-          <Feather name="plus" size={16} color={theme.text} />
-        </Pressable>
+          <Feather name="plus" size={16} color="#FFFFFF" />
+        </PressableMotion>
       </View>
     </View>
   );
@@ -236,15 +278,18 @@ function FormSelectField({
     <View style={[styles.fieldGroup, { position: 'relative', zIndex: open ? 10000 : 1 }]}>
       <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>{fieldLabelText}</Text>
       <View style={{ position: 'relative', zIndex: open ? 10000 : 1 }}>
-        <Pressable
-          style={({ pressed }) => [
+        <PressableMotion
+          pressScale={0.985}
+          hoverScale={1.01}
+          hoverShadow
+          onPress={() => setOpen(!open)}
+          contentStyle={[
             styles.selectTrigger,
             {
-              backgroundColor: pressed || open ? (isDark ? '#262D37' : '#E2E8F0') : (isDark ? '#161B22' : '#F8FAFC'),
+              backgroundColor: open ? (isDark ? '#1E2A3A' : '#EEF4FF') : isDark ? '#161B22' : '#F8FAFC',
               borderColor: open ? '#007AFF' : theme.surfaceBorder,
             },
           ]}
-          onPress={() => setOpen(!open)}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
             {iconName ? <Feather name={iconName} size={15} color={theme.textMuted} style={{ marginRight: 8 }} /> : null}
@@ -252,47 +297,67 @@ function FormSelectField({
               {selected?.label ?? 'Seleccionar...'}
             </Text>
           </View>
-          <Feather name="chevron-down" size={16} color={theme.textMuted} />
-        </Pressable>
+          <Feather name={open ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textMuted} />
+        </PressableMotion>
 
-        {open ? (
-          <>
-            <Pressable style={styles.popoverBackdrop} onPress={() => setOpen(false)} />
-            <View
-              style={[
-                styles.selectPopover,
-                { backgroundColor: theme.surface, borderColor: theme.surfaceBorder },
-              ]}
-            >
-              {options.map((opt) => {
-                const isSelected = opt.value === value;
-                return (
-                  <Pressable
-                    key={opt.value}
-                    style={({ pressed }) => [
-                      styles.selectOption,
-                      (isSelected || pressed) && { backgroundColor: isDark ? '#262D37' : '#E2E8F0' },
-                    ]}
+        {open ? <Pressable style={styles.popoverBackdrop} onPress={() => setOpen(false)} /> : null}
+
+        <DropdownReveal open={open} style={styles.selectPopoverWrap}>
+          <View
+            style={[
+              styles.selectPopover,
+              {
+                backgroundColor: theme.surface,
+                borderColor: theme.surfaceBorder,
+                ...(Platform.OS === 'web'
+                  ? ({
+                      boxShadow: isDark
+                        ? '0 18px 48px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,122,255,0.12)'
+                        : '0 16px 40px rgba(15,23,42,0.16), 0 0 0 1px rgba(0,122,255,0.08)',
+                    } as object)
+                  : {
+                      shadowColor: '#000',
+                      shadowOpacity: 0.35,
+                      shadowRadius: 14,
+                      shadowOffset: { width: 0, height: 10 },
+                      elevation: 12,
+                    }),
+              },
+            ]}
+          >
+            {options.map((opt, index) => {
+              const isSelected = opt.value === value;
+              return (
+                <DropdownRevealItem key={opt.value} index={index}>
+                  <PressableMotion
+                    pressScale={0.97}
+                    hoverScale={1.015}
+                    hoverShadow
                     onPress={() => {
                       onChange(opt.value);
                       setOpen(false);
                     }}
+                    contentStyle={[
+                      styles.selectOption,
+                      isSelected && { backgroundColor: isDark ? '#1E2A3A' : '#EEF4FF' },
+                    ]}
                   >
                     <Text
                       style={[
                         styles.selectOptionText,
                         { color: isSelected ? theme.text : theme.textMuted },
-                        isSelected && { fontWeight: 'bold' },
+                        isSelected && { fontWeight: 'bold', color: isDark ? '#FFFFFF' : '#0B4EA2' },
                       ]}
                     >
                       {opt.label}
                     </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </>
-        ) : null}
+                    {isSelected ? <Feather name="check" size={14} color="#007AFF" /> : null}
+                  </PressableMotion>
+                </DropdownRevealItem>
+              );
+            })}
+          </View>
+        </DropdownReveal>
       </View>
     </View>
   );
@@ -765,31 +830,40 @@ const styles = StyleSheet.create({
     gap: 14,
   },
 
-  /* Stepper Input */
-  stepperContainer: {
+  /* Stepper Input unificado */
+  stepperShell: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  stepperBtn: {
-    width: 44,
     height: 44,
     borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    gap: 8,
+  },
+  stepperCircleBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  stepperInputBox: {
+  stepperValueWrap: {
     flex: 1,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 2,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
   },
   stepperInputText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    width: '100%',
+    fontSize: 18,
+    fontWeight: '800',
+    minWidth: 28,
+    textAlign: 'center',
+    paddingVertical: 0,
+  },
+  stepperUnit: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   /* Single Date Picker Input */
@@ -816,20 +890,19 @@ const styles = StyleSheet.create({
     height: '100vh' as any,
     zIndex: 9998,
   },
-  singleCalendarPopover: {
+  singleCalendarPopoverWrap: {
     position: 'absolute',
     top: 48,
     left: 0,
+    zIndex: 10001,
+    elevation: 10001,
+  },
+  singleCalendarPopover: {
     width: 280,
     borderRadius: 16,
     borderWidth: 1,
     padding: 14,
-    zIndex: 10001,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
+    overflow: 'hidden',
   },
   calendarMonthHeader: {
     flexDirection: 'row',
@@ -898,24 +971,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  selectPopover: {
+  selectPopoverWrap: {
     position: 'absolute',
     top: 48,
     left: 0,
     right: 0,
+    zIndex: 10001,
+    elevation: 10001,
+  },
+  selectPopover: {
     borderRadius: 12,
     borderWidth: 1,
-    paddingVertical: 6,
-    zIndex: 10001,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
+    padding: 6,
   },
   selectOption: {
     paddingHorizontal: 14,
     paddingVertical: 10,
+    borderRadius: 10,
+    marginBottom: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   selectOptionText: {
     fontSize: 13,

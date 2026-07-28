@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { industry, label } from '@/config/industry';
 import { ThemeToggleSwitch } from '@/core/theme/ThemeToggleSwitch';
 import { ProfileButton } from '@/core/profile/ProfileModal';
 import { useTheme } from '@/core/theme/ThemeContext';
+import { PressableMotion } from '@/core/ui/PressableMotion';
 
 const TAB_ICONS: Record<string, keyof typeof Feather.glyphMap> = {
   index: 'file-text',
@@ -58,7 +59,13 @@ function CustomTopTabBar({ state, descriptors, navigation }: any) {
   return (
     <View style={[styles.topBarContainer, { backgroundColor: theme.background, borderBottomColor: theme.border }]}>
       {/* Centro: Barra Flotante de Píldora */}
-      <View style={[styles.floatingPillBar, { backgroundColor: theme.pillBg, borderColor: theme.border }]}>
+      <View
+        style={[
+          styles.floatingPillBar,
+          { backgroundColor: theme.pillBg, borderColor: theme.border },
+          theme.mode === 'light' && styles.floatingPillBarLight,
+        ]}
+      >
         {/* Píldora animada deslizante de fondo */}
         {layouts[state.index] ? (
           <Animated.View
@@ -94,11 +101,14 @@ function CustomTopTabBar({ state, descriptors, navigation }: any) {
           };
 
           return (
-            <Pressable
+            <PressableMotion
               key={route.key}
               onLayout={(e) => handleItemLayout(index, e)}
               onPress={onPress}
+              pressScale={0.97}
+              hoverScale={1.02}
               style={styles.tabButton}
+              contentStyle={styles.tabButtonInner}
             >
               <Feather
                 name={iconName}
@@ -115,7 +125,7 @@ function CustomTopTabBar({ state, descriptors, navigation }: any) {
               >
                 {labelText}
               </Text>
-            </Pressable>
+            </PressableMotion>
           );
         })}
       </View>
@@ -183,6 +193,14 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: 1,
   },
+  floatingPillBarLight: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
+    backgroundColor: '#FFFFFF',
+  },
   animatedIndicator: {
     position: 'absolute',
     top: 4,
@@ -196,6 +214,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   tabButton: {
+    zIndex: 1,
+  },
+  tabButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -203,7 +224,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 24,
     gap: 6,
-    zIndex: 1,
   },
   tabIcon: {
     marginRight: 2,

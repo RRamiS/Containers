@@ -35,6 +35,8 @@ import { radius, spacing } from '@/core/theme';
 import { useTheme } from '@/core/theme/ThemeContext';
 import { toast } from '@/core/ui/ToastContext';
 import { Screen } from '@/core/ui/Screen';
+import { DropdownReveal, DropdownRevealItem } from '@/core/ui/Reveal';
+import { PressableMotion } from '@/core/ui/PressableMotion';
 
 // Paleta de colores para avatares circulares
 const AVATAR_COLORS = [
@@ -128,41 +130,72 @@ function DarkSelectDropdown({
 
   return (
     <View style={[styles.dropdownContainer, open && { zIndex: 10000 }]}>
-      <Pressable
-        style={({ pressed }) => [
+      <PressableMotion
+        pressScale={0.97}
+        hoverScale={1.02}
+        hoverShadow
+        onPress={() => setOpen(!open)}
+        contentStyle={[
           styles.dropdownPillTrigger,
           {
-            backgroundColor: pressed || open ? (isDark ? '#2B333E' : '#E2E8F0') : (isDark ? '#1C2128' : '#FFFFFF'),
-            borderColor: theme.surfaceBorder,
+            backgroundColor: open ? (isDark ? '#2B333E' : '#E8EEF6') : isDark ? '#1C2128' : '#FFFFFF',
+            borderColor: open ? (isDark ? '#3B4553' : '#CBD5E1') : theme.surfaceBorder,
           },
         ]}
-        onPress={() => setOpen(!open)}
       >
         {iconName ? <Feather name={iconName} size={14} color={theme.textMuted} style={{ marginRight: 6 }} /> : null}
         <Text style={[styles.dropdownTriggerText, { color: theme.text }]} numberOfLines={1}>
           {displayTitle}
         </Text>
-        <Feather name="chevron-down" size={13} color={theme.textMuted} style={{ marginLeft: 6 }} />
-      </Pressable>
+        <Feather
+          name={open ? 'chevron-up' : 'chevron-down'}
+          size={13}
+          color={theme.textMuted}
+          style={{ marginLeft: 6 }}
+        />
+      </PressableMotion>
 
-      {open ? (
-        <>
-          {/* Backdrop para cerrar al hacer clic en cualquier lugar fuera */}
-          <Pressable style={styles.popoverBackdrop} onPress={() => setOpen(false)} />
-          <View style={[styles.dropdownPopover, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]}>
-            {options.map((opt) => {
-              const isSelected = opt.value === value;
-              return (
-                <Pressable
-                  key={opt.value}
-                  style={({ pressed }) => [
-                    styles.dropdownOption,
-                    (isSelected || pressed) && { backgroundColor: isDark ? '#2D333B' : '#E2E8F0' },
-                  ]}
+      {open ? <Pressable style={styles.popoverBackdrop} onPress={() => setOpen(false)} /> : null}
+
+      <DropdownReveal open={open} style={styles.dropdownPopoverWrap}>
+        <View
+          style={[
+            styles.dropdownPopover,
+            {
+              backgroundColor: theme.surface,
+              borderColor: theme.surfaceBorder,
+              ...(Platform.OS === 'web'
+                ? ({
+                    boxShadow: isDark
+                      ? '0 18px 48px rgba(0,0,0,0.65), 0 0 0 1px rgba(0,122,255,0.12)'
+                      : '0 16px 40px rgba(15,23,42,0.16), 0 0 0 1px rgba(0,122,255,0.08)',
+                  } as object)
+                : {
+                    shadowColor: '#000',
+                    shadowOpacity: 0.35,
+                    shadowRadius: 16,
+                    shadowOffset: { width: 0, height: 10 },
+                    elevation: 12,
+                  }),
+            },
+          ]}
+        >
+          {options.map((opt, index) => {
+            const isSelected = opt.value === value;
+            return (
+              <DropdownRevealItem key={opt.value} index={index}>
+                <PressableMotion
+                  pressScale={0.97}
+                  hoverScale={1.015}
+                  hoverShadow
                   onPress={() => {
                     onChange(opt.value);
                     setOpen(false);
                   }}
+                  contentStyle={[
+                    styles.dropdownOption,
+                    isSelected && { backgroundColor: isDark ? '#2D333B' : '#EEF4FF' },
+                  ]}
                 >
                   <Text
                     style={[
@@ -173,12 +206,13 @@ function DarkSelectDropdown({
                   >
                     {opt.label}
                   </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
-      ) : null}
+                  {isSelected ? <Feather name="check" size={14} color="#007AFF" /> : null}
+                </PressableMotion>
+              </DropdownRevealItem>
+            );
+          })}
+        </View>
+      </DropdownReveal>
     </View>
   );
 }
@@ -584,7 +618,7 @@ export function StatsScreen() {
               ]}
               onPress={() => void handleExport()}
             >
-              <Feather name="download" size={13} color={theme.textMuted} style={{ marginRight: 5 }} />
+              <Feather name="download" size={13} color="#22C55E" style={{ marginRight: 5 }} />
               <Text style={[styles.actionPillText, { color: theme.text }]}>Exportar CSV</Text>
             </Pressable>
           </View>
@@ -655,7 +689,7 @@ export function StatsScreen() {
                         style={({ pressed, hovered }: any) => [
                           styles.tableBodyRow,
                           {
-                            backgroundColor: (hovered || pressed) ? (isDark ? '#232C37' : '#F1F5F9') : theme.tableRowBg,
+                            backgroundColor: (hovered || pressed) ? theme.tableRowHover : theme.tableRowBg,
                             borderBottomColor: theme.border,
                           },
                         ]}
@@ -685,7 +719,7 @@ export function StatsScreen() {
                           </Text>
                         </View>
 
-                        {/* 3. Ubicación (Texto breve truncado con ícono external-link) */}
+                        {/* 3. Ubicación (ícono send azul) */}
                         <View style={styles.colLocation}>
                           <Pressable
                             style={({ pressed }) => [
@@ -701,13 +735,13 @@ export function StatsScreen() {
                             <Text style={[styles.cellText, { color: theme.text, flexShrink: 1 }]} numberOfLines={1}>
                               {item.address || 'Sin dirección'}
                             </Text>
-                            <Feather name="external-link" size={13} color="#0084FF" style={{ marginLeft: 6 }} />
+                            <Feather name="send" size={13} color="#0084FF" style={{ marginLeft: 6 }} />
                           </Pressable>
                         </View>
 
                         {/* 4. Fecha Registro (Con hora completa: Dec 8, 2025 · 12:32 PM) */}
                         <View style={styles.colRegDate}>
-                          <Text style={styles.regDateText} numberOfLines={1}>
+                          <Text style={[styles.regDateText, { color: theme.text }]} numberOfLines={1}>
                             {formatRegistrationTimestamp(item.created_at)}
                           </Text>
                         </View>
@@ -771,18 +805,20 @@ export function StatsScreen() {
                               void handleOpenReceipt(item.receipt_uri, item.receipt_name);
                             }}
                             hitSlop={4}
+                            style={styles.receiptPressable}
                           >
-                            <Text
-                              style={[
-                                styles.receiptBadge,
-                                item.receipt_name
-                                  ? { backgroundColor: 'rgba(0, 132, 255, 0.15)', color: '#0084FF' }
-                                  : { color: theme.textMuted },
-                              ]}
-                              numberOfLines={1}
-                            >
-                              {item.receipt_name ? `📄 ${item.receipt_name}` : 'Sin archivo'}
-                            </Text>
+                            {item.receipt_name ? (
+                              <View style={styles.receiptBadgeRow}>
+                                <Feather name="download" size={13} color="#22C55E" style={{ marginRight: 5 }} />
+                                <Text style={[styles.receiptBadge, styles.receiptBadgeActive]} numberOfLines={1}>
+                                  {item.receipt_name}
+                                </Text>
+                              </View>
+                            ) : (
+                              <Text style={[styles.receiptBadge, { color: theme.textMuted }]} numberOfLines={1}>
+                                Sin archivo
+                              </Text>
+                            )}
                           </Pressable>
                         </View>
 
@@ -1005,29 +1041,32 @@ const styles = StyleSheet.create({
     height: '100vh' as any,
     zIndex: 9998,
   },
-  dropdownPopover: {
+  dropdownPopoverWrap: {
     position: 'absolute',
     top: 42,
     left: 0,
-    minWidth: 170,
+    zIndex: 99999,
+    elevation: 99999,
+  },
+  dropdownPopover: {
+    minWidth: 180,
     borderRadius: 14,
     borderWidth: 1,
     padding: 6,
-    zIndex: 99999,
-    elevation: 99999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
   },
   dropdownOption: {
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 10,
     marginBottom: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   dropdownOptionText: {
     fontSize: 13,
+    flex: 1,
   },
 
   /* Date Range Picker Trigger Píldora */
@@ -1258,7 +1297,7 @@ const styles = StyleSheet.create({
   regDateText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#38BDF8',
+    flexShrink: 1,
   },
   colDays: {
     minWidth: 70,
@@ -1327,6 +1366,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
+  },
+  receiptPressable: {
+    alignSelf: 'flex-start',
+  },
+  receiptBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    maxWidth: '100%',
+  },
+  receiptBadgeActive: {
+    color: '#22C55E',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    flexShrink: 1,
   },
   badgeContainer: {
     flexDirection: 'row',

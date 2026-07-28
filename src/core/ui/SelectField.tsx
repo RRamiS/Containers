@@ -1,6 +1,7 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing, typography } from '../theme';
+import { PressableMotion } from './PressableMotion';
 
 type Option = { label: string; value: string };
 
@@ -19,19 +20,30 @@ export function SelectField({ label, value, options, onChange, error }: Props) {
   return (
     <View style={styles.wrap}>
       <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      <View style={styles.row}>
         {options.map((option) => {
           const selected = option.value === value;
           return (
-            <Pressable
+            <PressableMotion
               key={option.value}
               onPress={() => onChange(option.value)}
-              style={[
+              pressScale={0.96}
+              hoverScale={1.04}
+              contentStyle={[
                 styles.chip,
                 {
                   backgroundColor: selected ? (isDark ? '#343D49' : '#007AFF') : theme.surface,
                   borderColor: selected ? (isDark ? '#343D49' : '#007AFF') : theme.border,
                 },
+                !isDark && !selected
+                  ? {
+                      shadowColor: '#0F172A',
+                      shadowOpacity: 0.04,
+                      shadowRadius: 4,
+                      shadowOffset: { width: 0, height: 1 },
+                      elevation: 1,
+                    }
+                  : null,
               ]}
             >
               <Text
@@ -43,10 +55,10 @@ export function SelectField({ label, value, options, onChange, error }: Props) {
               >
                 {option.label}
               </Text>
-            </Pressable>
+            </PressableMotion>
           );
         })}
-      </ScrollView>
+      </View>
       {error ? <Text style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
     </View>
   );
@@ -59,7 +71,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     fontWeight: '600',
   },
-  row: { gap: spacing.sm },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,

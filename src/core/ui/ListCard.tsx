@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '../theme/ThemeContext';
+import { Platform, StyleSheet, Text, View } from 'react-native';
+import { cardShadow, useTheme } from '../theme/ThemeContext';
 import { spacing, typography } from '../theme';
+import { PressableMotion } from './PressableMotion';
 
 type Props = {
   title: string;
@@ -13,18 +14,21 @@ type Props = {
 };
 
 export function ListCard({ title, subtitle, meta, onPress, badge, right }: Props) {
-  const { theme } = useTheme();
+  const { mode, theme } = useTheme();
 
   return (
-    <Pressable
+    <PressableMotion
       onPress={onPress}
-      style={({ pressed }) => [
+      pressScale={0.985}
+      hoverScale={1.008}
+      style={styles.outer}
+      contentStyle={[
         styles.card,
         {
           backgroundColor: theme.surface,
           borderColor: theme.border,
         },
-        pressed && styles.pressed,
+        mode === 'light' ? cardShadow('light') : null,
       ]}
     >
       <View style={styles.body}>
@@ -40,21 +44,25 @@ export function ListCard({ title, subtitle, meta, onPress, badge, right }: Props
         {meta ? <Text style={[styles.meta, { color: theme.textMuted }]}>{meta}</Text> : null}
       </View>
       {right}
-    </Pressable>
+    </PressableMotion>
   );
 }
 
 const styles = StyleSheet.create({
+  outer: {
+    marginBottom: spacing.sm,
+  },
   card: {
     borderRadius: 12,
     padding: spacing.md,
-    marginBottom: spacing.sm,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    ...(Platform.OS === 'web'
+      ? ({ transition: 'border-color 160ms ease, box-shadow 160ms ease' } as object)
+      : null),
   },
-  pressed: { opacity: 0.9 },
   body: { flex: 1 },
   top: {
     flexDirection: 'row',

@@ -26,7 +26,7 @@ export const containersIndustry: IndustryConfig = {
   rentalStatuses: [
     { value: 'activo', label: 'Activo (En cliente)', color: '#16A34A' }, // Verde
     { value: 'entregado', label: 'Entregado / Activo', color: '#16A34A' }, // Verde
-    { value: 'en_proceso', label: 'En tránsito', color: '#0EA5E9' }, // Celeste
+    { value: 'en_proceso', label: 'En proceso', color: '#0EA5E9' }, // Celeste
     { value: 'en_transito', label: 'En tránsito', color: '#0EA5E9' }, // Celeste
     { value: 'finalizado', label: 'Finalizado (En depósito)', color: '#F59E0B' }, // Amarillo
   ],

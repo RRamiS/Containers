@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing, typography } from '../theme';
 
@@ -15,6 +16,18 @@ export function Screen({ title, subtitle, loading, right, children }: Props) {
   const { theme } = useTheme();
   const hasTitleOrSubtitle = Boolean((title && title.trim() !== '') || (subtitle && subtitle.trim() !== ''));
   const hasHeader = hasTitleOrSubtitle || Boolean(right);
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(8)).current;
+
+  useEffect(() => {
+    if (loading) return;
+    fade.setValue(0);
+    slide.setValue(8);
+    Animated.parallel([
+      Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.spring(slide, { toValue: 0, useNativeDriver: true, tension: 120, friction: 14 }),
+    ]).start();
+  }, [loading, fade, slide]);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
@@ -36,7 +49,9 @@ export function Screen({ title, subtitle, loading, right, children }: Props) {
           <ActivityIndicator size="large" color="#007AFF" />
         </View>
       ) : (
-        children
+        <Animated.View style={{ flex: 1, opacity: fade, transform: [{ translateY: slide }] }}>
+          {children}
+        </Animated.View>
       )}
     </View>
   );

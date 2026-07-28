@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.rramis.containers",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Necesitamos acceso a la galería para adjuntar recibos y comprobantes.",
-        "NSCameraUsageDescription": "Necesitamos la cámara para fotografiar recibos y comprobantes."
+        "NSCameraUsageDescription": "Necesitamos la cámara para fotografiar recibos y comprobantes.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -26,7 +27,8 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {

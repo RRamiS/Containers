@@ -1,6 +1,5 @@
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   type PressableProps,
@@ -9,6 +8,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { spacing } from '../theme';
+import { PressableMotion } from './PressableMotion';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
@@ -39,19 +39,20 @@ export function Button({ title, loading, variant = 'primary', style, disabled, .
   const vStyle = getVariantStyles();
 
   return (
-    <Pressable
+    <PressableMotion
       accessibilityRole="button"
       disabled={isDisabled}
-      style={({ pressed }) => [
+      pressScale={0.97}
+      hoverScale={1.02}
+      style={style}
+      contentStyle={[
         styles.base,
         {
           backgroundColor: vStyle.backgroundColor,
           borderColor: vStyle.border,
           borderWidth: variant === 'secondary' ? 1 : 0,
+          opacity: isDisabled ? 0.5 : 1,
         },
-        pressed && !isDisabled && styles.pressed,
-        isDisabled && styles.disabled,
-        style,
       ]}
       {...rest}
     >
@@ -67,7 +68,7 @@ export function Button({ title, loading, variant = 'primary', style, disabled, .
           {title}
         </Text>
       )}
-    </Pressable>
+    </PressableMotion>
   );
 }
 
@@ -79,8 +80,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.5 },
   label: {
     fontSize: 14,
     fontWeight: '600',

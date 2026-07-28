@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 export type ThemeMode = 'dark' | 'light';
 
@@ -19,10 +20,14 @@ export type ThemeColors = {
   tableHeaderBg: string;
   tableRowBg: string;
   tableRowPressed: string;
+  tableRowHover: string;
   inputBg: string;
   inputBorder: string;
+  inputFocusBorder: string;
   danger: string;
   success: string;
+  shadow: string;
+  overlay: string;
 };
 
 export const darkTheme: ThemeColors = {
@@ -41,33 +46,59 @@ export const darkTheme: ThemeColors = {
   tableHeaderBg: '#1C2128',
   tableRowBg: '#0F1216',
   tableRowPressed: '#1A2027',
+  tableRowHover: '#151B22',
   inputBg: '#161C23',
   inputBorder: '#262C36',
+  inputFocusBorder: '#3B82F6',
   danger: '#F85149',
   success: '#2E7D32',
+  shadow: 'rgba(0,0,0,0.35)',
+  overlay: 'rgba(0,0,0,0.55)',
 };
 
+/** Light más moderno: fondo frío suave, superficies limpias, bordes menos grises */
 export const lightTheme: ThemeColors = {
   mode: 'light',
-  background: '#F4F6F8',
+  background: '#EEF2F7',
   surface: '#FFFFFF',
-  surfaceBorder: '#E2E8F0',
+  surfaceBorder: '#E4EAF2',
   card: '#FFFFFF',
   text: '#0F172A',
-  textMuted: '#64748B',
-  border: '#E2E8F0',
+  textMuted: '#5B6B7C',
+  border: '#E4EAF2',
   primary: '#FFFFFF',
-  accent: '#C4A35A',
+  accent: '#B8934A',
   pillBg: '#E2E8F0',
   pillIndicator: '#FFFFFF',
   tableHeaderBg: '#F1F5F9',
   tableRowBg: '#FFFFFF',
-  tableRowPressed: '#F8FAFC',
+  tableRowPressed: '#E8EEF6',
+  tableRowHover: '#F5F8FC',
   inputBg: '#FFFFFF',
-  inputBorder: '#CBD5E1',
+  inputBorder: '#D5DEE9',
+  inputFocusBorder: '#3B82F6',
   danger: '#DC2626',
   success: '#16A34A',
+  shadow: 'rgba(15, 23, 42, 0.08)',
+  overlay: 'rgba(15, 23, 42, 0.35)',
 };
+
+export const cardShadow = (mode: ThemeMode) =>
+  Platform.select({
+    web: {
+      boxShadow:
+        mode === 'light'
+          ? '0 1px 2px rgba(15,23,42,0.04), 0 4px 16px rgba(15,23,42,0.06)'
+          : '0 1px 2px rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.25)',
+    } as object,
+    default: {
+      shadowColor: mode === 'light' ? '#0F172A' : '#000',
+      shadowOffset: { width: 0, height: mode === 'light' ? 2 : 4 },
+      shadowOpacity: mode === 'light' ? 0.06 : 0.3,
+      shadowRadius: mode === 'light' ? 8 : 12,
+      elevation: mode === 'light' ? 2 : 4,
+    },
+  });
 
 type ThemeContextType = {
   mode: ThemeMode;
