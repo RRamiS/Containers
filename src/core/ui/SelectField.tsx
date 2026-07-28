@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
+import { spacing, typography } from '../theme';
 
 type Option = { label: string; value: string };
 
@@ -12,9 +13,12 @@ type Props = {
 };
 
 export function SelectField({ label, value, options, onChange, error }: Props) {
+  const { mode, theme } = useTheme();
+  const isDark = mode === 'dark';
+
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {options.map((option) => {
           const selected = option.value === value;
@@ -22,14 +26,28 @@ export function SelectField({ label, value, options, onChange, error }: Props) {
             <Pressable
               key={option.value}
               onPress={() => onChange(option.value)}
-              style={[styles.chip, selected && styles.chipSelected]}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: selected ? (isDark ? '#343D49' : '#007AFF') : theme.surface,
+                  borderColor: selected ? (isDark ? '#343D49' : '#007AFF') : theme.border,
+                },
+              ]}
             >
-              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{option.label}</Text>
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: selected ? '#FFFFFF' : theme.text },
+                  selected && styles.chipTextSelected,
+                ]}
+              >
+                {option.label}
+              </Text>
             </Pressable>
           );
         })}
       </ScrollView>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
     </View>
   );
 }
@@ -40,7 +58,6 @@ const styles = StyleSheet.create({
     ...typography.caption,
     marginBottom: spacing.xs,
     fontWeight: '600',
-    color: colors.text,
   },
   row: { gap: spacing.sm },
   chip: {
@@ -48,14 +65,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
   },
-  chipSelected: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  chipText: { color: colors.text, fontSize: 14 },
-  chipTextSelected: { color: '#fff', fontWeight: '600' },
-  error: { marginTop: spacing.xs, color: colors.danger, fontSize: 12 },
+  chipText: { fontSize: 14 },
+  chipTextSelected: { fontWeight: '600' },
+  error: { marginTop: spacing.xs, fontSize: 12 },
 });

@@ -3,7 +3,7 @@ import type { IndustryConfig } from './types';
 export const containersIndustry: IndustryConfig = {
   id: 'containers',
   appName: 'Containers',
-  primaryColor: '#0F3D2E',
+  primaryColor: '#0F1216',
   accentColor: '#C4A35A',
   labels: {
     asset: { singular: 'Contenedor', plural: 'Contenedores' },
@@ -18,14 +18,21 @@ export const containersIndustry: IndustryConfig = {
     startDate: 'Fecha',
   },
   assetStatuses: [
-    { value: 'disponible', label: 'Disponible', color: '#2E7D32' },
-    { value: 'alquilado', label: 'Alquilado', color: '#1565C0' },
-    { value: 'mantenimiento', label: 'Mantenimiento', color: '#E65100' },
+    { value: 'en_deposito', label: 'En Depósito', color: '#F59E0B' }, // Amarillo
+    { value: 'en_cliente', label: 'En Cliente / Colocado', color: '#16A34A' }, // Verde
+    { value: 'en_transito', label: 'En Tránsito / Camión', color: '#0EA5E9' }, // Celeste
+    { value: 'fijo', label: 'Fijo', color: '#2563EB' }, // Azul
   ],
   rentalStatuses: [
-    { value: 'activo', label: 'Activo', color: '#2E7D32' },
-    { value: 'en_proceso', label: 'En proceso', color: '#F9A825' },
-    { value: 'finalizado', label: 'Finalizado', color: '#616161' },
+    { value: 'activo', label: 'Activo (En cliente)', color: '#16A34A' }, // Verde
+    { value: 'entregado', label: 'Entregado / Activo', color: '#16A34A' }, // Verde
+    { value: 'en_proceso', label: 'En tránsito', color: '#0EA5E9' }, // Celeste
+    { value: 'en_transito', label: 'En tránsito', color: '#0EA5E9' }, // Celeste
+    { value: 'finalizado', label: 'Finalizado (En depósito)', color: '#F59E0B' }, // Amarillo
+  ],
+  paymentStatuses: [
+    { value: 'realizado', label: 'Pago Realizado', color: '#2E7D32' },
+    { value: 'pendiente', label: 'Pago Pendiente', color: '#E65100' },
   ],
   features: {
     map: true,

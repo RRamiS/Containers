@@ -7,7 +7,8 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { colors, spacing } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
+import { spacing } from '../theme';
 
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
@@ -19,14 +20,35 @@ type Props = PressableProps & {
 };
 
 export function Button({ title, loading, variant = 'primary', style, disabled, ...rest }: Props) {
+  const { theme } = useTheme();
   const isDisabled = disabled || loading;
+
+  const getVariantStyles = () => {
+    switch (variant) {
+      case 'primary':
+        return { backgroundColor: '#007AFF', border: 'transparent' };
+      case 'secondary':
+        return { backgroundColor: theme.surface, border: theme.border };
+      case 'danger':
+        return { backgroundColor: theme.danger, border: 'transparent' };
+      case 'ghost':
+        return { backgroundColor: 'transparent', border: 'transparent' };
+    }
+  };
+
+  const vStyle = getVariantStyles();
+
   return (
     <Pressable
       accessibilityRole="button"
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
-        styles[variant],
+        {
+          backgroundColor: vStyle.backgroundColor,
+          borderColor: vStyle.border,
+          borderWidth: variant === 'secondary' ? 1 : 0,
+        },
         pressed && !isDisabled && styles.pressed,
         isDisabled && styles.disabled,
         style,
@@ -34,9 +56,14 @@ export function Button({ title, loading, variant = 'primary', style, disabled, .
       {...rest}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'secondary' || variant === 'ghost' ? colors.primary : '#fff'} />
+        <ActivityIndicator color={variant === 'secondary' || variant === 'ghost' ? theme.text : '#fff'} />
       ) : (
-        <Text style={[styles.label, variant === 'secondary' || variant === 'ghost' ? styles.labelDark : null]}>
+        <Text
+          style={[
+            styles.label,
+            { color: variant === 'secondary' || variant === 'ghost' ? theme.text : '#FFFFFF' },
+          ]}
+        >
           {title}
         </Text>
       )}
@@ -46,26 +73,16 @@ export function Button({ title, loading, variant = 'primary', style, disabled, .
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 48,
+    minHeight: 44,
     borderRadius: 10,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primary: { backgroundColor: colors.primary },
-  secondary: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  danger: { backgroundColor: colors.danger },
-  ghost: { backgroundColor: 'transparent' },
   pressed: { opacity: 0.85 },
   disabled: { opacity: 0.5 },
   label: {
-    color: '#fff',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
-  labelDark: { color: colors.text },
 });

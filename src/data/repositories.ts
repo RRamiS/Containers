@@ -3,13 +3,18 @@ import { createId, localDb, nowIso } from './localDb';
 import { isSupabaseConfigured, supabase } from './supabase';
 import type {
   Asset,
+  ContainerStockConfig,
   CreateAssetInput,
+  CreateFixedContainerInput,
   CreateOperatorInput,
   CreateRentalInput,
+  FixedContainer,
   Operator,
   Rental,
   RentalWithRelations,
+  StockSummary,
   UpdateAssetInput,
+  UpdateFixedContainerInput,
   UpdateOperatorInput,
   UpdateRentalInput,
 } from './types';
@@ -25,7 +30,7 @@ async function enrichRentals(rentals: Rental[]): Promise<RentalWithRelations[]> 
 
   return rentals.map((rental) => ({
     ...rental,
-    asset: assetMap.get(rental.asset_id) ?? null,
+    asset: rental.asset_id ? assetMap.get(rental.asset_id) ?? null : null,
     delivery_operator: rental.delivery_operator_id
       ? opMap.get(rental.delivery_operator_id) ?? null
       : null,
@@ -34,6 +39,91 @@ async function enrichRentals(rentals: Rental[]): Promise<RentalWithRelations[]> 
       : null,
   }));
 }
+
+export const fixedContainersRepo = {
+  async list(): Promise<FixedContainer[]> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('fixed_containers').select('*').order('created_at', { ascending: false });
+      if (!error && data) return data as FixedContainer[];
+    }
+    const items = await localDb.fixedContainers.list();
+    return items.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+
+  async create(input: CreateFixedContainerInput): Promise<FixedContainer> {
+    const stamp = nowIso();
+    const item: FixedContainer = { ...input, id: createId(), created_at: stamp, updated_at: stamp };
+
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase.from('fixed_containers').insert(item).select().single();
+      if (!error && data) return data as FixedContainer;
+    }
+
+    const items = await localDb.fixedContainers.list();
+    items.push(item);
+    await localDb.fixedContainers.save(items);
+    return item;
+  },
+
+  async update(id: string, input: UpdateFixedContainerInput): Promise<FixedContainer> {
+    if (isSupabaseConfigured && supabase) {
+      const { data, error } = await supabase
+        .from('fixed_containers')
+        .update({ ...input, updated_at: nowIso() })
+        .eq('id', id)
+        .select()
+        .single();
+      if (!error && data) return data as FixedContainer;
+    }
+
+    const items = await localDb.fixedContainers.list();
+    const index = items.findIndex((f) => f.id === id);
+    if (index < 0) throw new Error('Contenedor fijo no encontrado');
+    items[index] = { ...items[index], ...input, updated_at: nowIso() };
+    await localDb.fixedContainers.save(items);
+    return items[index];
+  },
+
+  async remove(id: string): Promise<void> {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.from('fixed_containers').delete().eq('id', id);
+      if (!error) return;
+    }
+    const items = await localDb.fixedContainers.list();
+    await localDb.fixedContainers.save(items.filter((f) => f.id !== id));
+  },
+};
+
+export const stockRepo = {
+  async getConfig(): Promise<ContainerStockConfig> {
+    return localDb.stockConfig.get();
+  },
+
+  async saveConfig(config: ContainerStockConfig): Promise<ContainerStockConfig> {
+    await localDb.stockConfig.save(config);
+    return config;
+  },
+
+  async getSummary(): Promise<StockSummary> {
+    const config = await this.getConfig();
+    const fixedList = await fixedContainersRepo.list();
+    const rentals = await rentalsRepo.list();
+
+    const in_client = rentals.filter((r) => r.status === 'activo').length;
+    const in_transit = rentals.filter((r) => r.status === 'en_proceso').length;
+    const fixed = fixedList.length;
+    const total = config.total_units;
+    const in_depot = Math.max(0, total - in_client - in_transit - fixed);
+
+    return {
+      total,
+      in_depot,
+      in_client,
+      in_transit,
+      fixed,
+    };
+  },
+};
 
 export const assetsRepo = {
   async list(): Promise<Asset[]> {
@@ -156,7 +246,7 @@ export const rentalsRepo = {
     if (isSupabaseConfigured && supabase) {
       let query = supabase
         .from('rentals')
-        .select('*, asset:assets(*), delivery_operator:operators!rentals_delivery_operator_id_fkey(*), pickup_operator:operators!rentals_pickup_operator_id_fkey(*)')
+        .select('*, delivery_operator:operators!rentals_delivery_operator_id_fkey(*), pickup_operator:operators!rentals_pickup_operator_id_fkey(*)')
         .order('created_at', { ascending: false });
       if (status) query = query.eq('status', status);
       const { data, error } = await query;
@@ -180,6 +270,8 @@ export const rentalsRepo = {
     const end_date = input.end_date ?? computeEndDate(input.start_date, input.rental_days);
     const item: Rental = {
       ...input,
+      asset_id: input.asset_id ?? null,
+      rental_type: input.rental_type ?? 'temporal',
       end_date,
       id: createId(),
       created_at: stamp,
@@ -189,24 +281,12 @@ export const rentalsRepo = {
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.from('rentals').insert(item).select().single();
       if (error) throw error;
-      if (item.asset_id) {
-        await supabase.from('assets').update({ status: 'alquilado', updated_at: stamp }).eq('id', item.asset_id);
-      }
       return data as Rental;
     }
 
     const items = await localDb.rentals.list();
     items.push(item);
     await localDb.rentals.save(items);
-
-    if (item.asset_id) {
-      const assets = await localDb.assets.list();
-      const idx = assets.findIndex((a) => a.id === item.asset_id);
-      if (idx >= 0) {
-        assets[idx] = { ...assets[idx], status: 'alquilado', updated_at: stamp };
-        await localDb.assets.save(assets);
-      }
-    }
 
     return item;
   },
@@ -229,10 +309,6 @@ export const rentalsRepo = {
       }
       const { data, error } = await supabase.from('rentals').update(patch).eq('id', id).select().single();
       if (error) throw error;
-
-      if (input.status === 'finalizado' && data?.asset_id) {
-        await supabase.from('assets').update({ status: 'disponible', updated_at: stamp }).eq('id', data.asset_id);
-      }
       return data as Rental;
     }
 
@@ -249,15 +325,6 @@ export const rentalsRepo = {
 
     items[index] = { ...current, ...input, end_date, updated_at: stamp };
     await localDb.rentals.save(items);
-
-    if (input.status === 'finalizado' && items[index].asset_id) {
-      const assets = await localDb.assets.list();
-      const aIdx = assets.findIndex((a) => a.id === items[index].asset_id);
-      if (aIdx >= 0) {
-        assets[aIdx] = { ...assets[aIdx], status: 'disponible', updated_at: stamp };
-        await localDb.assets.save(assets);
-      }
-    }
 
     return items[index];
   },

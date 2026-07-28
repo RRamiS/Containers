@@ -34,7 +34,7 @@ export function LocationMap({
 
   if (Platform.OS === 'web') {
     return (
-      <View style={[styles.wrap, { height }]}>
+      <View style={[styles.wrap, { height: height as any }]}>
         <iframe
           ref={iframeRef}
           title="map"
@@ -52,7 +52,7 @@ export function LocationMap({
   }
 
   return (
-    <View style={[styles.wrap, { height }]}>
+    <View style={[styles.wrap, { height: height as any }]}>
       <WebView
         originWhitelist={['*']}
         source={{ html }}

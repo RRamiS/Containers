@@ -71,6 +71,8 @@ Plantilla de ítem:
 
 ## Hecho recientemente (referencia)
 
+- Modelo de gestión por **Stock de Contenedores** (sin IDs individuales) y diferenciación de contenedores **Fijos** vs **Temporales**.
+- Estados de stock: En depósito, En cliente, En tránsito y Fijos.
 - App Expo + Tauri, CRUDs alquileres/activos/choferes
 - Mapa San Luis, colores por estado, finalizados ocultos
 - Export CSV, modo local, schema Supabase, docs de handoff

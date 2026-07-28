@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
+import { spacing, typography } from '../theme';
 
 type Props = {
   title: string;
@@ -12,19 +13,31 @@ type Props = {
 };
 
 export function ListCard({ title, subtitle, meta, onPress, badge, right }: Props) {
+  const { theme } = useTheme();
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.card,
+        {
+          backgroundColor: theme.surface,
+          borderColor: theme.border,
+        },
+        pressed && styles.pressed,
+      ]}
+    >
       <View style={styles.body}>
         <View style={styles.top}>
-          <Text style={styles.title}>{title}</Text>
+          <Text style={[styles.title, { color: theme.text }]}>{title}</Text>
           {badge ? (
             <View style={[styles.badge, { backgroundColor: `${badge.color}22` }]}>
               <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
             </View>
           ) : null}
         </View>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-        {meta ? <Text style={styles.meta}>{meta}</Text> : null}
+        {subtitle ? <Text style={[styles.subtitle, { color: theme.textMuted }]}>{subtitle}</Text> : null}
+        {meta ? <Text style={[styles.meta, { color: theme.textMuted }]}>{meta}</Text> : null}
       </View>
       {right}
     </Pressable>
@@ -33,12 +46,10 @@ export function ListCard({ title, subtitle, meta, onPress, badge, right }: Props
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: spacing.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -59,7 +70,6 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.body,
     marginTop: 4,
-    color: colors.textMuted,
   },
   meta: {
     ...typography.caption,

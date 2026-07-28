@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
+import { spacing, typography } from '../theme';
 
 type Props = {
-  title: string;
+  title?: string;
   subtitle?: string;
   loading?: boolean;
   right?: ReactNode;
@@ -11,18 +12,28 @@ type Props = {
 };
 
 export function Screen({ title, subtitle, loading, right, children }: Props) {
+  const { theme } = useTheme();
+  const hasTitleOrSubtitle = Boolean((title && title.trim() !== '') || (subtitle && subtitle.trim() !== ''));
+  const hasHeader = hasTitleOrSubtitle || Boolean(right);
+
   return (
-    <View style={styles.root}>
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={typography.title}>{title}</Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+    <View style={[styles.root, { backgroundColor: theme.background }]}>
+      {hasHeader ? (
+        <View style={styles.header}>
+          {hasTitleOrSubtitle ? (
+            <View style={styles.headerText}>
+              {title ? <Text style={[typography.title, { color: theme.text }]}>{title}</Text> : null}
+              {subtitle ? <Text style={[styles.subtitle, { color: theme.textMuted }]}>{subtitle}</Text> : null}
+            </View>
+          ) : (
+            <View style={{ flex: 1 }} />
+          )}
+          {right}
         </View>
-        {right}
-      </View>
+      ) : null}
       {loading ? (
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color="#007AFF" />
         </View>
       ) : (
         children
@@ -34,13 +45,12 @@ export function Screen({ title, subtitle, loading, right, children }: Props) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.md,
     gap: spacing.md,

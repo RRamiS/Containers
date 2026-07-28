@@ -48,17 +48,92 @@ export function rentalsToCsv(rentals: RentalWithRelations[]): string {
   return [headers.join(','), ...rows].join('\n');
 }
 
+function downloadCsvWeb(csvContent: string, filename: string) {
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.style.display = 'none';
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, 500);
+}
+
 export async function exportRentalsCsv(rentals: RentalWithRelations[], filename = 'alquileres.csv') {
   const csv = rentalsToCsv(rentals);
 
-  if (Platform.OS === 'web') {
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.click();
-    URL.revokeObjectURL(url);
+  if (Platform.OS === 'web' || typeof document !== 'undefined') {
+    downloadCsvWeb(csv, filename);
+    return;
+  }
+
+  await Share.share({
+    title: filename,
+    message: csv,
+  });
+}
+
+export function formatOpId(id: string): string {
+  if (!id) return '#4586900';
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) % 9000000;
+  }
+  const numericCode = 1000000 + Math.abs(hash);
+  return `#${numericCode}`;
+}
+
+export function transactionsToCsv(rentals: RentalWithRelations[]): string {
+  const headers = [
+    'ID Operación',
+    'Cliente',
+    'Ubicación',
+    'Fecha de Entrega',
+    'Días de Estacionamiento',
+    'Monto Unitario ($)',
+    'Monto Total ($)',
+    'Estado del Cobro',
+    'Comprobante',
+    'Estado Operativo',
+  ];
+
+  const rows = rentals.map((r) => {
+    const unitAmt =
+      r.unit_amount != null
+        ? r.unit_amount
+        : r.amount != null && r.rental_days > 0
+          ? Math.round(r.amount / r.rental_days)
+          : '';
+
+    return [
+      formatOpId(r.id),
+      r.client_name,
+      r.address || 'Sin dirección',
+      r.start_date,
+      r.rental_days,
+      unitAmt,
+      r.amount != null ? r.amount : '',
+      r.payment_status === 'realizado' ? 'Pago Realizado' : 'Pago Pendiente',
+      r.receipt_name ? r.receipt_name : 'Sin comprobante',
+      r.status,
+    ]
+      .map(escapeCsv)
+      .join(',');
+  });
+
+  return [headers.join(','), ...rows].join('\n');
+}
+
+export async function exportTransactionsCsv(rentals: RentalWithRelations[], filename = 'transacciones-estadisticas.csv') {
+  const csv = transactionsToCsv(rentals);
+
+  if (Platform.OS === 'web' || typeof document !== 'undefined') {
+    downloadCsvWeb(csv, filename);
     return;
   }
 

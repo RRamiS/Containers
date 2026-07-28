@@ -1,5 +1,6 @@
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
-import { colors, spacing, typography } from '../theme';
+import { useTheme } from '../theme/ThemeContext';
+import { spacing, typography } from '../theme';
 
 type Props = TextInputProps & {
   label: string;
@@ -7,15 +8,25 @@ type Props = TextInputProps & {
 };
 
 export function TextField({ label, error, style, ...rest }: Props) {
+  const { theme } = useTheme();
+
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: theme.text }]}>{label}</Text>
       <TextInput
-        placeholderTextColor={colors.textMuted}
-        style={[styles.input, error ? styles.inputError : null, style]}
+        placeholderTextColor={theme.textMuted}
+        style={[
+          styles.input,
+          {
+            backgroundColor: theme.inputBg,
+            borderColor: error ? theme.danger : theme.inputBorder,
+            color: theme.text,
+          },
+          style,
+        ]}
         {...rest}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
     </View>
   );
 }
@@ -26,18 +37,13 @@ const styles = StyleSheet.create({
     ...typography.caption,
     marginBottom: spacing.xs,
     fontWeight: '600',
-    color: colors.text,
   },
   input: {
     minHeight: 48,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.surface,
-    color: colors.text,
     fontSize: 15,
   },
-  inputError: { borderColor: colors.danger },
-  error: { marginTop: spacing.xs, color: colors.danger, fontSize: 12 },
+  error: { marginTop: spacing.xs, fontSize: 12 },
 });

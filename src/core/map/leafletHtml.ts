@@ -47,7 +47,16 @@ export function buildLeafletHtml(options: {
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    function colorIcon(color) {
+    function colorIcon(color, badgeText) {
+      if (badgeText != null && badgeText !== '') {
+        return L.divIcon({
+          className: '',
+          html: '<div style="background:' + (color || '#FFC107') + '; color: #000000; font-weight: bold; font-size: 11px; width: 26px; height: 26px; border-radius: 50%; border: 2px solid #FFFFFF; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.4);">' + badgeText + '</div>',
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+          popupAnchor: [0, -14]
+        });
+      }
       return L.divIcon({
         className: '',
         html: '<div class="status-pin" style="background:' + (color || '#1565C0') + '"></div>',
@@ -59,7 +68,7 @@ export function buildLeafletHtml(options: {
 
     const markers = ${JSON.stringify(markers)};
     markers.forEach((m) => {
-      const marker = L.marker([m.lat, m.lng], { icon: colorIcon(m.color) }).addTo(map);
+      const marker = L.marker([m.lat, m.lng], { icon: colorIcon(m.color, m.badgeText) }).addTo(map);
       if (m.label) marker.bindPopup(m.label);
     });
 

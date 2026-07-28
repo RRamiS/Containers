@@ -4,6 +4,7 @@ export type MapMarker = {
   lng: number;
   label?: string;
   color?: string;
+  badgeText?: string;
 };
 
 export type MapLocation = {
@@ -13,7 +14,7 @@ export type MapLocation = {
 };
 
 export type LocationMapProps = {
-  height?: number;
+  height?: number | string;
   center?: { lat: number; lng: number };
   zoom?: number;
   markers?: MapMarker[];

@@ -52,11 +52,11 @@ Finalizar / coordinar retiro
   → deja de aparecer en el mapa
 ```
 
-### Listado y filtros
+### Listado y tabla visual
 
-- Columnas: cliente, contenedor, fechas, días, dirección, estado
-- Filtro por estado (todos / activo / en proceso / finalizado)
-- Botón **Exportar** → CSV del listado filtrado
+- Tabla con encabezado redondeado oscuro (`#1C2128`) y filas ordenadas: **Cliente / Obra**, **Ubicación**, **Duración & Fechas**, **Chofer** y **Estado**.
+- Filas clickeables que abren el detalle e historial individual del alquiler (`/rentals/[id]`).
+- Filtro selector por estado y exportación a CSV.
 
 ### Archivos clave
 
@@ -66,30 +66,27 @@ Finalizar / coordinar retiro
 
 ---
 
-## 2. Contenedores / Activos (`assets`) — `partial`
+## 2. Contenedores / Activos (`assets`) — `done`
 
 **Dónde:** pestaña Contenedores · `src/features/assets/`
 
 ### Qué hace
 
-Inventario de unidades alquilables.
+Gestión del parque de contenedores mediante **Stock de Unidades** (sin identificadores o códigos individuales obligatorios) y registro de **Contenedores Fijos**.
 
-### Campos actuales (mínimos)
+### Estados del Stock
 
-| Campo | Notas |
-|-------|-------|
-| Código | Identificador visible (ej. `C-001`) |
-| Notas | Texto libre |
-| Estado | `disponible` · `alquilado` · `mantenimiento` |
-| `metadata` | JSON listo para atributos futuros sin migrar el núcleo |
+| Estado Interno | Etiqueta en UI | Descripción |
+|---|---|---|
+| `en_deposito` | **En Depósito** | Contenedores disponibles/vacíos parados en la base. |
+| `en_cliente` | **En Cliente / Colocado** | Contenedores colocados en alquileres temporales activos. |
+| `en_transito` | **En Tránsito / Camión** | Contenedores en viaje (entrega, retiro o recambio). |
+| `fijo` | **Fijo** | Contenedores asignados a ubicaciones permanentes o de meses de duración. |
 
-### Limitación conocida
+### Contenedores Fijos vs. Temporales
 
-El cliente **aún no definió** todos los atributos del contenedor (tamaño, color, serie, etc.). Cuando lleguen:
-
-1. Preferir `metadata` o `custom_field_defs` / `custom_field_values`
-2. Actualizar formulario en `AssetFormScreen`
-3. Documentar acá los campos nuevos
+1. **Temporales:** Se gestionan vía la solapa *Alquileres*, descontando y restituyendo stock del depósito automáticamente.
+2. **Fijos:** Se configuran directamente en la solapa *Contenedores*, asignándoles cliente/empresa, dirección, fecha de colocación y geolocalización en el mapa (destacados en color violeta `#7B1FA2`).
 
 ---
 
@@ -183,16 +180,45 @@ Limitaciones actuales:
 
 ---
 
+## 9. Estadísticas y Transacciones — `done`
+
+**Dónde:** solapa Stats (`app/(tabs)/stats.tsx`) · `src/features/stats/`
+
+- **Dashboard Financiero/Operativo:** Total cobrado ($), Total pendiente ($), Operaciones activas y finalizadas.
+- **Eliminación de Borde Azul de Foco:** Desactivación global de bordes celestes por defecto (`outline: none`) en botones, campos y filas de tablas.
+- **Efectos Hover y Prensa:** Efecto sutil que aclara el tono de fondo al pasar o presionar sobre botones, píldoras de filtro y filas de la tabla (`#1F2732` / `#F1F5F9`).
+- **Cierre de Filtros al Hacer Clic Afuera:** Incorporación de capa invisible de captura que pliega automáticamente cualquier menú desplegable o calendario al hacer clic en cualquier sector exterior de la pantalla.
+- **Corrección de Números en Calendario (Modo Oscuro):** Números del selector de rango de fechas estilizados en blanco nítido (`#FFFFFF`) para máxima visibilidad en modo oscuro.
+- **Conmutador de Modo Claro / Oscuro Animado:** Switch tipo cápsula con animación física deslizante Spring (Sol ☀️ / Luna 🌙) que propaga el tema claro o gris oscuro a todos los componentes de la app con persistencia local (`@containers/theme_mode`).
+- **Botón y Modal de Perfil de Usuario:** Botón circular con ícono de usuario en la barra superior derecha que despliega un modal estilizado con nombre (**Emiliano Romero**), rol (**Administrador**), email y acciones de sesión.
+- **Modal CRUD de Nuevo Alquiler:** Rediseño del formulario a ventana modal flotante centrada con fondo atenueado (`rgba(0,0,0,0.7)`).
+- **Control de Fechas Dual:** Badge de *Fecha de Registro* automática con hora (`DD/MM/YYYY - HH:mm`) y selector interactivo de *Fecha de Entrega* con calendario popover estilo Estadísticas.
+- **Input Stepper de Días (+/-):** Control de incremento/decremento configurado en `3` días por defecto.
+- **Selects y Montos Lado a Lado:** Selectores desplegables estilo Estadísticas para *Estado del Pago* y *Chofer*, y campos de *Monto Unitario ($)* y *Monto Total ($)* posicionados en dos columnas con cálculo automático recíproco.
+- **Carga de Comprobante Condicional:** El cuadro de carga de comprobante/recibo se ubica directamente debajo del selector de *Estado del Pago* y solo aparece de forma dinámica cuando se selecciona `Pago Realizado`.
+- **Sistema Global de Toast Notifications:** Componente `ToastProvider` e interfaz `toast` con las 5 variantes del diseño de referencia (`success`, `info`, `error`, `warning`, `loading`). Notifica automáticamente acciones como la creación/actualización/eliminación de alquileres, exportaciones CSV, copiado de IDs al portapapeles, cambios de tema y cierre de sesión.
+- **Solapa y Rediseño de Operaciones Diarias:** Renombrado de la solapa principal a **Operaciones Diarias** con la misma estética de filtros flotantes en píldora (*Estado Operativo*, *Estado de Pago*, *Chofer*, *Rango de Fechas*, *Exportar CSV*, *Search...* y *+ Nuevo Alquiler*) y tabla de 9 columnas centrada (`minWidth 980px`) con avatares de cliente, IDs copiables y botones de acción circulares.
+- **Mapa Operativo & Paleta de Colores Unificada:** 
+  - 💛 **Depósito:** Amarillo (`#F59E0B`), mostrando el conteo real unificado de stock en depósito (**23** tanto en la chincheta del mapa como en las métricas).
+  - 🔵 **Contenedores Fijos:** Azul (`#2563EB`) tanto en los pines del mapa como en la leyenda, píldora de stock y encabezado de la Columna 1.
+  - 🟢 **Entregados / Activos:** Verde (`#16A34A`), con inclusión completa de alquileres en estado `activo` y `entregado` en la Columna 3.
+  - 🩵 **En Tránsito:** Celeste (`#0EA5E9`) en los pines de traslados, leyenda y Columna 2.
+- **Modal de Edición de Flota Total:** Componente modal flotante `EditFleetModal` con control stepper (`-`/`+`) y botones de atajo rápido (`20`, `30`, `50`, `75`, `100` u.) accesible mediante el botón de edición (✏️) al lado de la *Flota Total* en el Mapa.
+- **Superposición de Popovers (zIndex Stacking):** Orden de apilamiento decreciente por fila que garantiza que los menús desplegables y el calendario floten sobre todos los elementos inferiores sin cortarse.
+
+---
+
 ## Matriz rápida
 
 | Feature | Estado | Escalable vía |
 |---------|--------|---------------|
-| Alquileres CRUD | done | `features/rentals` + config |
-| Contenedores CRUD | partial | `metadata` / custom fields |
+| Operaciones Diarias (Alquileres CRUD) | done | `features/rentals` + config |
+| Contenedores Stock & Fijos | done | `features/assets` + `fixedContainersRepo` |
+| Estadísticas & Transacciones | done | `features/stats` |
 | Choferes CRUD | done | `features/operators` |
 | Mapa + filtros | done | `features/map-overview` + config estados |
 | Export CSV | done | `features/exports` |
+| Barra Flotante Pill | done | `app/(tabs)/_layout.tsx` |
 | Multi-rubro | done | `config/industry/*` |
 | Auth | planned | Supabase Auth + UI |
 | Storage recibos | planned | bucket `attachments` |
-| Campos contenedor finales | planned | custom fields |

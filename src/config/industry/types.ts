@@ -36,6 +36,7 @@ export type IndustryConfig = {
   };
   assetStatuses: StatusOption[];
   rentalStatuses: StatusOption[];
+  paymentStatuses?: StatusOption[];
   features: {
     map: boolean;
     receipt: boolean;

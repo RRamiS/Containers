@@ -2,14 +2,14 @@ import { StyleSheet } from 'react-native';
 import { industry } from '@/config/industry';
 
 export const colors = {
-  primary: industry.primaryColor,
+  primary: '#0F1216',
   accent: industry.accentColor,
-  background: '#F4F6F5',
-  surface: '#FFFFFF',
-  text: '#1A1F1C',
-  textMuted: '#5C6B63',
-  border: '#D5DED9',
-  danger: '#B3261E',
+  background: '#0F1216',
+  surface: '#161C23',
+  text: '#FFFFFF',
+  textMuted: '#8EA0B5',
+  border: '#1E232A',
+  danger: '#F85149',
   success: '#2E7D32',
 };
 
@@ -21,14 +21,20 @@ export const spacing = {
   xl: 32,
 };
 
+export const radius = {
+  sm: 6,
+  md: 8,
+  lg: 12,
+};
+
 export const typography = StyleSheet.create({
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
     color: colors.text,
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: colors.text,
   },

@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Platform,
   Pressable,
@@ -22,14 +23,13 @@ import { es } from 'date-fns/locale';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { industry } from '@/config/industry';
-import { operatorsRepo, rentalsRepo } from '@/data/repositories';
-import type { Operator, RentalWithRelations } from '@/data/types';
-import { exportRentalsCsv, formatOpId } from '@/features/exports/exportCsv';
-import { Screen } from '@/core/ui/Screen';
-import { spacing } from '@/core/theme';
+import { rentalsRepo } from '@/data/repositories';
+import type { RentalWithRelations } from '@/data/types';
+import { exportTransactionsCsv, formatOpId } from '@/features/exports/exportCsv';
+import { radius, spacing } from '@/core/theme';
 import { useTheme } from '@/core/theme/ThemeContext';
 import { toast } from '@/core/ui/ToastContext';
-import { confirmAction } from '@/core/ui/confirm';
+import { Screen } from '@/core/ui/Screen';
 
 // Paleta de colores para avatares circulares
 const AVATAR_COLORS = [
@@ -39,26 +39,33 @@ const AVATAR_COLORS = [
   '#10B981',
   '#F59E0B',
   '#6366F1',
+  '#06B6D4',
   '#8B5CF6',
-  '#14B8A6',
 ];
 
-function getClientAvatarColor(name: string) {
+function getClientAvatarColor(name: string): string {
+  if (!name) return AVATAR_COLORS[0];
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const index = Math.abs(hash) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[index];
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function copyToClipboard(text: string) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+    void navigator.clipboard.writeText(text);
+  }
+  Alert.alert('ID Copiado', `ID ${text} copiado al portapapeles`);
 }
 
 // ==========================================
-// 1. Buscador Estilo Píldora Redondeada
+// 1. Buscador Redondeado Pill (Sin Título Superior)
 // ==========================================
 function DarkSearchInput({
   value,
   onChangeText,
-  placeholder = 'Search...',
+  placeholder,
 }: {
   value: string;
   onChangeText: (text: string) => void;
@@ -70,27 +77,29 @@ function DarkSearchInput({
   return (
     <View
       style={[
-        styles.searchInputPill,
-        {
-          backgroundColor: isDark ? '#1C2128' : '#FFFFFF',
-          borderColor: theme.surfaceBorder,
-        },
+        styles.darkSearchWrap,
+        { backgroundColor: isDark ? '#1C2128' : '#FFFFFF', borderColor: theme.surfaceBorder },
       ]}
     >
-      <Feather name="search" size={14} color={theme.textMuted} style={{ marginRight: 8 }} />
+      <Feather name="search" size={14} color={theme.textMuted} style={styles.searchIcon} />
       <TextInput
-        style={[styles.searchInputText, { color: theme.text }]}
+        style={[styles.darkSearchInput, { color: theme.text }]}
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder}
+        placeholder={placeholder ?? 'Search...'}
         placeholderTextColor={theme.textMuted}
       />
+      {value ? (
+        <Pressable onPress={() => onChangeText('')} style={styles.clearSearchBtn}>
+          <Feather name="x" size={14} color={theme.textMuted} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
 // ==========================================
-// 2. Select Dropdown Pill
+// 2. Select Dropdown Pill (Sin Título Superior)
 // ==========================================
 function DarkSelectDropdown({
   iconName,
@@ -133,6 +142,7 @@ function DarkSelectDropdown({
 
       {open ? (
         <>
+          {/* Backdrop para cerrar al hacer clic en cualquier lugar fuera */}
           <Pressable style={styles.popoverBackdrop} onPress={() => setOpen(false)} />
           <View style={[styles.dropdownPopover, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]}>
             {options.map((opt) => {
@@ -169,7 +179,7 @@ function DarkSelectDropdown({
 }
 
 // ==========================================
-// 3. Date Range Picker Pill
+// 3. Date Range Picker Pill (Sin Título Superior)
 // ==========================================
 function DarkDateRangePicker({
   startDate,
@@ -195,6 +205,7 @@ function DarkDateRangePicker({
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
   const startDayOfWeek = (monthStart.getDay() + 6) % 7;
   const emptyPrefixDays = Array.from({ length: startDayOfWeek });
 
@@ -244,8 +255,10 @@ function DarkDateRangePicker({
 
       {open ? (
         <>
+          {/* Backdrop para cerrar al hacer clic afuera */}
           <Pressable style={styles.popoverBackdrop} onPress={() => setOpen(false)} />
           <View style={[styles.calendarPopover, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]}>
+            {/* Presets Rápidos */}
             <View style={styles.presetsRow}>
               <Pressable
                 style={({ pressed }) => [
@@ -276,6 +289,7 @@ function DarkDateRangePicker({
               </Pressable>
             </View>
 
+            {/* Navegación de Mes */}
             <View style={styles.monthHeader}>
               <Text style={[styles.monthTitle, { color: theme.text }]}>
                 {format(currentMonth, 'MMMM yyyy', { locale: es })}
@@ -296,6 +310,7 @@ function DarkDateRangePicker({
               </View>
             </View>
 
+            {/* Encabezado Días de la Semana */}
             <View style={styles.weekDaysRow}>
               {['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map((d) => (
                 <Text key={d} style={styles.weekDayText}>
@@ -304,6 +319,7 @@ function DarkDateRangePicker({
               ))}
             </View>
 
+            {/* Grilla de Días */}
             <View style={styles.daysGrid}>
               {emptyPrefixDays.map((_, i) => (
                 <View key={`empty-${i}`} style={styles.dayCellEmpty} />
@@ -354,36 +370,34 @@ function DarkDateRangePicker({
 }
 
 // ==========================================
-// Pantalla Principal: RentalsListScreen (Operaciones Diarias)
+// Componente Principal StatsScreen
 // ==========================================
-export function RentalsListScreen() {
+export function StatsScreen() {
   const router = useRouter();
   const { mode, theme } = useTheme();
   const isDark = mode === 'dark';
 
   const [rentals, setRentals] = useState<RentalWithRelations[]>([]);
-  const [operators, setOperators] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
-  // Filtros
-  const [statusFilter, setStatusFilter] = useState('all');
+  // Estados de Filtros
+  const [searchQuery, setSearchQuery] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('all');
-  const [operatorFilter, setOperatorFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [startDateFilter, setStartDateFilter] = useState<string | null>(null);
   const [endDateFilter, setEndDateFilter] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
 
-  const loadData = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [rentalList, operatorList] = await Promise.all([
-        rentalsRepo.list(),
-        operatorsRepo.list(),
-      ]);
-      setRentals(rentalList);
-      setOperators(operatorList);
+      const data = await rentalsRepo.list();
+      setRentals(data);
     } catch (error) {
-      toast.error('Error al cargar operaciones', error instanceof Error ? error.message : 'Error inesperado');
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'No se pudieron cargar las transacciones',
+      );
     } finally {
       setLoading(false);
     }
@@ -391,9 +405,91 @@ export function RentalsListScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void loadData();
-    }, [loadData]),
+      void load();
+    }, [load]),
   );
+
+  const handleDelete = (item: RentalWithRelations) => {
+    const formattedId = formatOpId(item.id);
+    Alert.alert(
+      'Eliminar Operación',
+      `¿Estás seguro de que deseas eliminar la operación ${formattedId} (${item.client_name})?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await rentalsRepo.remove(item.id);
+              await load();
+            } catch (error) {
+              Alert.alert(
+                'Error',
+                error instanceof Error ? error.message : 'No se pudo eliminar la operación',
+              );
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  // Filtrado compuesto
+  const filteredRentals = useMemo(() => {
+    return rentals.filter((item) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const formattedId = formatOpId(item.id).toLowerCase();
+        const matchesId = formattedId.includes(q);
+        const matchesClient = item.client_name.toLowerCase().includes(q);
+        const matchesAddress = item.address.toLowerCase().includes(q);
+        if (!matchesId && !matchesClient && !matchesAddress) return false;
+      }
+      if (paymentFilter !== 'all') {
+        const itemPayment = item.payment_status ?? 'pendiente';
+        if (itemPayment !== paymentFilter) return false;
+      }
+      if (statusFilter !== 'all') {
+        if (item.status !== statusFilter) return false;
+      }
+      if (startDateFilter && item.start_date < startDateFilter) return false;
+      if (endDateFilter && item.start_date > endDateFilter) return false;
+
+      return true;
+    });
+  }, [rentals, searchQuery, paymentFilter, statusFilter, startDateFilter, endDateFilter]);
+
+  // Resumen métrico
+  const metrics = useMemo(() => {
+    let paidTotal = 0;
+    let pendingTotal = 0;
+    let activeCount = 0;
+    let finishedCount = 0;
+
+    rentals.forEach((r) => {
+      const amt = r.amount ?? 0;
+      if (r.payment_status === 'realizado') {
+        paidTotal += amt;
+      } else {
+        pendingTotal += amt;
+      }
+
+      if (r.status === 'finalizado') {
+        finishedCount++;
+      } else {
+        activeCount++;
+      }
+    });
+
+    return {
+      paidTotal,
+      pendingTotal,
+      activeCount,
+      finishedCount,
+      totalCount: rentals.length,
+    };
+  }, [rentals]);
 
   const copyToClipboard = (text: string) => {
     if (Platform.OS === 'web' && typeof navigator !== 'undefined') {
@@ -403,73 +499,54 @@ export function RentalsListScreen() {
   };
 
   const handleExport = async () => {
+    setExporting(true);
     try {
-      await exportRentalsCsv(filteredRentals, 'operaciones-diarias.csv');
-      toast.success('Exportación completada', `Se descargaron ${filteredRentals.length} operaciones.`);
+      await exportTransactionsCsv(filteredRentals, 'reporte-transacciones.csv');
+      toast.success('Exportación completada', `Se descargó el archivo CSV con ${filteredRentals.length} transacciones.`);
     } catch (error) {
       toast.error('Error al exportar', error instanceof Error ? error.message : 'No se pudo exportar');
+    } finally {
+      setExporting(false);
     }
   };
-
-  const handleDelete = async (id: string, client: string) => {
-    const ok = await confirmAction({
-      title: 'Eliminar Operación',
-      message: `¿Estás seguro de eliminar el alquiler de ${client}?`,
-      confirmLabel: 'Eliminar',
-    });
-    if (!ok) return;
-
-    try {
-      await rentalsRepo.remove(id);
-      toast.warning('Operación eliminada', `El registro de ${client} fue removido.`);
-      void loadData();
-    } catch (err) {
-      toast.error('Error al eliminar', err instanceof Error ? err.message : 'No se pudo eliminar');
-    }
-  };
-
-  // Filtrado Multicriterio
-  const filteredRentals = useMemo(() => {
-    return rentals.filter((r) => {
-      if (statusFilter !== 'all' && r.status !== statusFilter) return false;
-      if (paymentFilter !== 'all' && (r.payment_status || 'pendiente') !== paymentFilter) return false;
-      if (operatorFilter !== 'all' && r.delivery_operator_id !== operatorFilter && r.pickup_operator_id !== operatorFilter) {
-        return false;
-      }
-      if (startDateFilter && r.start_date < startDateFilter) return false;
-      if (endDateFilter && r.start_date > endDateFilter) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const client = r.client_name.toLowerCase();
-        const addr = (r.address || '').toLowerCase();
-        const formattedId = formatOpId(r.id).toLowerCase();
-        if (!client.includes(q) && !addr.includes(q) && !formattedId.includes(q)) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [rentals, statusFilter, paymentFilter, operatorFilter, startDateFilter, endDateFilter, searchQuery]);
 
   return (
     <Screen loading={loading}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-        {/* Toolbar Superior: Filtros Flotantes y Buscador Pill */}
-        <View style={styles.floatingToolbar}>
-          <View style={styles.filterPillsRow}>
-            {/* Filtro: Estado Operativo */}
-            <DarkSelectDropdown
-              iconName="layers"
-              defaultLabel="Estado Operativo"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={[
-                { label: 'Todos los estados', value: 'all' },
-                ...industry.rentalStatuses.map((s) => ({ label: s.label, value: s.value })),
-              ]}
-            />
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Dashboard de Métricas Financieras y Operativas */}
+        <View style={[styles.metricsCard, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]}>
+          <Text style={[styles.metricsTitle, { color: theme.text }]}>Resumen Financiero y Operativo</Text>
+          <View style={styles.metricsGrid}>
+            <View style={[styles.statBox, { backgroundColor: theme.background, borderLeftColor: '#2E7D32' }]}>
+              <Text style={[styles.statAmount, { color: '#2E7D32' }]}>
+                ${metrics.paidTotal.toLocaleString('es-AR')}
+              </Text>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Total Cobrado</Text>
+            </View>
 
-            {/* Filtro: Estado de Pago */}
+            <View style={[styles.statBox, { backgroundColor: theme.background, borderLeftColor: '#E65100' }]}>
+              <Text style={[styles.statAmount, { color: '#E65100' }]}>
+                ${metrics.pendingTotal.toLocaleString('es-AR')}
+              </Text>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Pendiente de Cobro</Text>
+            </View>
+
+            <View style={[styles.statBox, { backgroundColor: theme.background, borderLeftColor: '#1565C0' }]}>
+              <Text style={[styles.statAmount, { color: '#1565C0' }]}>{metrics.activeCount}</Text>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Operaciones Activas</Text>
+            </View>
+
+            <View style={[styles.statBox, { backgroundColor: theme.background, borderLeftColor: '#757575' }]}>
+              <Text style={[styles.statAmount, { color: '#757575' }]}>{metrics.finishedCount}</Text>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Finalizadas</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Barra de Filtros Flotante (Fondo Transparente sobre theme.background) */}
+        <View style={styles.filterFloatingToolbar}>
+          {/* Grupo Izquierdo de Botones Píldora */}
+          <View style={styles.filterPillsGroup}>
             <DarkSelectDropdown
               iconName="sliders"
               defaultLabel="Estado de Pago"
@@ -482,19 +559,17 @@ export function RentalsListScreen() {
               ]}
             />
 
-            {/* Filtro: Chofer */}
             <DarkSelectDropdown
-              iconName="truck"
-              defaultLabel="Chofer"
-              value={operatorFilter}
-              onChange={setOperatorFilter}
+              iconName="layers"
+              defaultLabel="Estado Operativo"
+              value={statusFilter}
+              onChange={setStatusFilter}
               options={[
-                { label: 'Todos los choferes', value: 'all' },
-                ...operators.map((o) => ({ label: o.full_name, value: o.id })),
+                { label: 'Todos los estados', value: 'all' },
+                ...industry.rentalStatuses.map((s) => ({ label: s.label, value: s.value })),
               ]}
             />
 
-            {/* Filtro: Rango de Fechas */}
             <DarkDateRangePicker
               startDate={startDateFilter}
               endDate={endDateFilter}
@@ -504,7 +579,6 @@ export function RentalsListScreen() {
               }}
             />
 
-            {/* Botón Píldora: Exportar CSV */}
             <Pressable
               style={({ pressed }) => [
                 styles.actionPillBtn,
@@ -518,21 +592,9 @@ export function RentalsListScreen() {
               <Feather name="download" size={13} color={theme.textMuted} style={{ marginRight: 5 }} />
               <Text style={[styles.actionPillText, { color: theme.text }]}>Exportar CSV</Text>
             </Pressable>
-
-            {/* Botón Píldora Principal: + Nuevo Alquiler */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.primaryPillBtn,
-                pressed && { opacity: 0.85 },
-              ]}
-              onPress={() => router.push('/rentals/new')}
-            >
-              <Feather name="plus" size={14} color="#FFFFFF" style={{ marginRight: 5 }} />
-              <Text style={styles.primaryPillText}>+ Nuevo Alquiler</Text>
-            </Pressable>
           </View>
 
-          {/* Buscador Píldora a la Derecha */}
+          {/* Buscador Píldora a la Derecha (Top Right) */}
           <View style={styles.searchPillWrap}>
             <DarkSearchInput
               value={searchQuery}
@@ -542,7 +604,7 @@ export function RentalsListScreen() {
           </View>
         </View>
 
-        {/* Tabla Centrada y Responsive con Ancho de Aplicación (minWidth 980) */}
+        {/* Tabla Centrada y Responsive con Ancho de la Aplicación */}
         <View style={styles.tableOuterCenteredContainer}>
           <ScrollView
             horizontal
@@ -550,24 +612,26 @@ export function RentalsListScreen() {
             contentContainerStyle={styles.tableScrollContainer}
           >
             <View style={[styles.tableWrapper, { backgroundColor: theme.surface, borderColor: theme.surfaceBorder }]}>
-              {/* Encabezado de la Tabla */}
+              {/* Header Redondeado (11 Columnas) */}
               <View style={[styles.tableHeaderRow, { backgroundColor: theme.tableHeaderBg }]}>
                 <Text style={[styles.headerCell, styles.colOpId, { color: theme.textMuted }]}>ID Operación</Text>
                 <Text style={[styles.headerCell, styles.colClient, { color: theme.textMuted }]}>Cliente</Text>
                 <Text style={[styles.headerCell, styles.colLocation, { color: theme.textMuted }]}>Ubicación</Text>
-                <Text style={[styles.headerCell, styles.colDate, { color: theme.textMuted }]}>Fecha / Días</Text>
-                <Text style={[styles.headerCell, styles.colOperator, { color: theme.textMuted }]}>Chofer</Text>
+                <Text style={[styles.headerCell, styles.colDate, { color: theme.textMuted }]}>Fecha Entrega</Text>
+                <Text style={[styles.headerCell, styles.colDays, { color: theme.textMuted }]}>Días Estac.</Text>
+                <Text style={[styles.headerCell, styles.colUnitAmount, { color: theme.textMuted }]}>Monto Unit. ($)</Text>
                 <Text style={[styles.headerCell, styles.colAmount, { color: theme.textMuted }]}>Monto Total ($)</Text>
                 <Text style={[styles.headerCell, styles.colPayment, { color: theme.textMuted }]}>Estado Cobro</Text>
+                <Text style={[styles.headerCell, styles.colReceipt, { color: theme.textMuted }]}>Comprobante</Text>
                 <Text style={[styles.headerCell, styles.colStatus, { color: theme.textMuted }]}>Estado Operativo</Text>
                 <Text style={[styles.headerCell, styles.colActions, { color: theme.textMuted }]}>Acciones</Text>
               </View>
 
-              {/* Cuerpo de la Tabla */}
+              {/* Lista de Filas */}
               {filteredRentals.length === 0 ? (
                 <View style={styles.emptyContainer}>
                   <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                    No se encontraron operaciones con los filtros aplicados.
+                    No se encontraron transacciones con los filtros aplicados.
                   </Text>
                 </View>
               ) : (
@@ -582,10 +646,12 @@ export function RentalsListScreen() {
                     const avatarColor = getClientAvatarColor(item.client_name);
                     const initialLetter = item.client_name ? item.client_name.charAt(0).toUpperCase() : 'C';
 
-                    const operatorName =
-                      item.status === 'finalizado'
-                        ? item.pickup_operator?.full_name
-                        : item.delivery_operator?.full_name;
+                    const unitAmt =
+                      item.unit_amount != null
+                        ? item.unit_amount
+                        : item.amount != null && item.rental_days > 0
+                          ? Math.round(item.amount / item.rental_days)
+                          : null;
 
                     return (
                       <Pressable
@@ -598,7 +664,7 @@ export function RentalsListScreen() {
                         ]}
                         onPress={() => router.push(`/rentals/${item.id}`)}
                       >
-                        {/* 1. ID Operación (#4586936) + Copiar */}
+                        {/* 1. ID Operación (#4586936) + Copy Icon */}
                         <View style={styles.colOpId}>
                           <Text style={[styles.opIdText, { color: theme.text }]}>{formattedId}</Text>
                           <Pressable
@@ -613,7 +679,7 @@ export function RentalsListScreen() {
                           </Pressable>
                         </View>
 
-                        {/* 2. Cliente con Avatar Circular */}
+                        {/* 2. Cliente con Avatarcito Circular */}
                         <View style={styles.colClient}>
                           <View style={[styles.avatarCircle, { backgroundColor: avatarColor }]}>
                             <Text style={styles.avatarInitialText}>{initialLetter}</Text>
@@ -625,100 +691,134 @@ export function RentalsListScreen() {
 
                         {/* 3. Ubicación */}
                         <View style={styles.colLocation}>
-                          <Text style={[styles.cellText, { color: theme.text }]} numberOfLines={1}>
-                            {item.address || 'Sin dirección registrada'}
+                          <Text style={[styles.cellText, { color: theme.textMuted }]} numberOfLines={1}>
+                            {item.address || 'Sin dirección'}
                           </Text>
                         </View>
 
-                        {/* 4. Fecha / Días */}
+                        {/* 4. Fecha Entrega */}
                         <View style={styles.colDate}>
-                          <Text style={[styles.cellTextBold, { color: theme.text }]}>
-                            {item.rental_days} días
-                          </Text>
-                          <Text style={[styles.cellSubText, { color: theme.textMuted }]}>
-                            {item.start_date}
+                          <Text style={[styles.cellText, { color: theme.text }]}>{item.start_date}</Text>
+                        </View>
+
+                        {/* 5. Días Estacionamiento */}
+                        <View style={styles.colDays}>
+                          <Text style={[styles.cellTextBold, { color: theme.text }]}>{item.rental_days} días</Text>
+                        </View>
+
+                        {/* 6. Monto Unitario ($) */}
+                        <View style={styles.colUnitAmount}>
+                          <Text style={[styles.cellText, { color: theme.text }]}>
+                            {unitAmt != null ? `$${unitAmt.toLocaleString('es-AR')}` : '—'}
                           </Text>
                         </View>
 
-                        {/* 5. Chofer Asignado */}
-                        <View style={styles.colOperator}>
-                          <Text style={[styles.cellText, { color: theme.text }]} numberOfLines={1}>
-                            {operatorName || 'Sin asignar'}
-                          </Text>
-                        </View>
-
-                        {/* 6. Monto Total ($) */}
+                        {/* 7. Monto Total ($) */}
                         <View style={styles.colAmount}>
-                          <Text style={[styles.amountText, { color: isPaid ? '#2E7D32' : theme.text }]}>
+                          <Text style={styles.amountText}>
                             {item.amount != null ? `$${item.amount.toLocaleString('es-AR')}` : '—'}
                           </Text>
                         </View>
 
-                        {/* 7. Estado del Cobro Badge */}
+                        {/* 8. Estado del Cobro */}
                         <View style={styles.colPayment}>
-                          <View style={[styles.paymentBadge, { backgroundColor: isPaid ? '#1B382B' : '#3B2418' }]}>
-                            <View style={[styles.badgeDot, { backgroundColor: isPaid ? '#22C55E' : '#F97316' }]} />
-                            <Text style={[styles.paymentBadgeText, { color: isPaid ? '#4ADE80' : '#FB923C' }]}>
+                          <View
+                            style={[
+                              styles.badgeContainer,
+                              { backgroundColor: isPaid ? '#2E7D3222' : '#E6510022' },
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.badgeDot,
+                                { backgroundColor: isPaid ? '#2E7D32' : '#E65100' },
+                              ]}
+                            />
+                            <Text
+                              style={[
+                                styles.badgeText,
+                                { color: isPaid ? '#2E7D32' : '#E65100' },
+                              ]}
+                            >
                               {isPaid ? 'Realizado' : 'Pendiente'}
                             </Text>
                           </View>
                         </View>
 
-                        {/* 8. Estado Operativo Badge */}
+                        {/* 9. Comprobante */}
+                        <View style={styles.colReceipt}>
+                          <Text
+                            style={[
+                              styles.receiptBadge,
+                              item.receipt_name
+                                ? { backgroundColor: theme.border, color: theme.text }
+                                : { color: theme.textMuted },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {item.receipt_name ? `📄 ${item.receipt_name}` : 'Sin archivo'}
+                          </Text>
+                        </View>
+
+                        {/* 10. Estado Operativo */}
                         <View style={styles.colStatus}>
-                          <View style={[styles.statusBadge, { backgroundColor: (st?.color ?? '#1565C0') + '22' }]}>
-                            <View style={[styles.badgeDot, { backgroundColor: st?.color ?? '#1565C0' }]} />
-                            <Text style={[styles.statusBadgeText, { color: st?.color ?? theme.text }]}>
+                          <View
+                            style={[
+                              styles.badgeContainer,
+                              { backgroundColor: (st?.color ?? '#1565C0') + '22' },
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.badgeDot,
+                                { backgroundColor: st?.color ?? '#1565C0' },
+                              ]}
+                            />
+                            <Text style={[styles.badgeText, { color: st?.color ?? theme.text }]}>
                               {st?.label ?? item.status}
                             </Text>
                           </View>
                         </View>
 
-                        {/* 9. Botones Circulares de Acciones */}
+                        {/* 11. Columna de Acciones con Íconos Circulares */}
                         <View style={styles.colActions}>
                           <Pressable
-                            style={({ pressed }) => [
-                              styles.actionCircleBtn,
-                              { backgroundColor: isDark ? '#262D37' : '#E2E8F0' },
-                              pressed && { opacity: 0.7 },
+                            style={[
+                              styles.actionIconCircle,
+                              { backgroundColor: isDark ? '#242C37' : '#F1F5F9' },
                             ]}
                             onPress={(e) => {
                               e.stopPropagation();
                               router.push(`/rentals/${item.id}`);
                             }}
-                            hitSlop={6}
+                            hitSlop={4}
                           >
                             <Feather name="eye" size={14} color={theme.text} />
                           </Pressable>
 
                           <Pressable
-                            style={({ pressed }) => [
-                              styles.actionCircleBtn,
-                              { backgroundColor: isDark ? '#262D37' : '#E2E8F0' },
-                              pressed && { opacity: 0.7 },
+                            style={[
+                              styles.actionIconCircle,
+                              { backgroundColor: isDark ? '#242C37' : '#F1F5F9' },
                             ]}
                             onPress={(e) => {
                               e.stopPropagation();
                               router.push(`/rentals/${item.id}`);
                             }}
-                            hitSlop={6}
+                            hitSlop={4}
                           >
                             <Feather name="edit-2" size={13} color={theme.text} />
                           </Pressable>
 
                           <Pressable
-                            style={({ pressed }) => [
-                              styles.actionCircleBtn,
-                              { backgroundColor: isDark ? '#3B1E1E' : '#FEE2E2' },
-                              pressed && { opacity: 0.7 },
-                            ]}
+                            style={[styles.actionIconCircle, styles.actionDeleteCircle]}
                             onPress={(e) => {
                               e.stopPropagation();
-                              void handleDelete(item.id, item.client_name);
+                              handleDelete(item);
                             }}
-                            hitSlop={6}
+                            hitSlop={4}
                           >
-                            <Feather name="trash-2" size={13} color="#EF4444" />
+                            <Feather name="trash-2" size={13} color="#F85149" />
                           </Pressable>
                         </View>
                       </Pressable>
@@ -734,53 +834,87 @@ export function RentalsListScreen() {
   );
 }
 
-// ==========================================
-// Estilos del Contenedor y Tabla
-// ==========================================
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: spacing.md,
-    gap: spacing.md,
+    paddingBottom: spacing.xl,
+  },
+  metricsCard: {
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+  },
+  metricsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: spacing.md,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  statBox: {
+    flex: 1,
+    minWidth: 140,
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    borderLeftWidth: 4,
+  },
+  statAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  statLabel: {
+    fontSize: 12,
+    marginTop: 2,
   },
 
-  /* Toolbar Superior Flotante */
-  floatingToolbar: {
+  /* Barra de Filtros Flotante Directa (Mismo color de fondo de la app) */
+  filterFloatingToolbar: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 12,
-    zIndex: 100,
-  },
-  filterPillsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    marginBottom: spacing.md,
     gap: 10,
-    zIndex: 100,
+    zIndex: 10000,
+    elevation: 10000,
+  },
+  filterPillsGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchPillWrap: {
+    minWidth: 180,
   },
 
-  /* Buscador Píldora Redondeada */
-  searchInputPill: {
+  /* Buscador Píldora Redondeado */
+  darkSearchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 20,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     height: 36,
     borderWidth: 1,
-    minWidth: 160,
   },
-  searchInputText: {
-    fontSize: 13,
+  searchIcon: {
+    marginRight: 6,
+  },
+  darkSearchInput: {
     flex: 1,
+    fontSize: 13,
   },
-  searchPillWrap: {
-    alignSelf: 'flex-end',
+  clearSearchBtn: {
+    padding: 3,
   },
 
-  /* Select Píldora Trigger */
+  /* Dropdown Trigger Píldora */
   dropdownContainer: {
     position: 'relative',
+    zIndex: 100,
   },
   dropdownPillTrigger: {
     flexDirection: 'row',
@@ -790,10 +924,14 @@ const styles = StyleSheet.create({
     height: 36,
     borderWidth: 1,
   },
+  dropdownTriggerActive: {
+    borderColor: '#007AFF',
+  },
   dropdownTriggerText: {
     fontSize: 13,
     fontWeight: '500',
   },
+  /* Popover Backdrop para cerrar al hacer clic afuera */
   popoverBackdrop: {
     position: 'fixed' as any,
     top: 0,
@@ -811,25 +949,28 @@ const styles = StyleSheet.create({
     minWidth: 170,
     borderRadius: 14,
     borderWidth: 1,
-    paddingVertical: 6,
-    zIndex: 10001,
+    padding: 6,
+    zIndex: 99999,
+    elevation: 99999,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowRadius: 10,
-    elevation: 8,
   },
   dropdownOption: {
-    paddingHorizontal: 14,
     paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 2,
   },
   dropdownOptionText: {
     fontSize: 13,
   },
 
-  /* Date Range Picker */
+  /* Date Range Picker Trigger Píldora */
   datePickerContainer: {
     position: 'relative',
+    zIndex: 100,
   },
   datePickerPillTrigger: {
     flexDirection: 'row',
@@ -851,12 +992,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     padding: 14,
-    zIndex: 10001,
+    zIndex: 99999,
+    elevation: 99999,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
   },
   presetsRow: {
     flexDirection: 'row',
@@ -864,19 +1005,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   presetChip: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
   },
   presetChipText: {
     fontSize: 11,
-    fontWeight: '600',
   },
   monthHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   monthTitle: {
     fontSize: 13,
@@ -885,7 +1025,7 @@ const styles = StyleSheet.create({
   },
   monthNavBtns: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 8,
   },
   navBtn: {
     padding: 4,
@@ -900,37 +1040,39 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 11,
     color: '#8EA0B5',
-    textTransform: 'capitalize',
+    fontWeight: 'bold',
   },
   daysGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 2,
   },
   dayCellEmpty: {
-    width: '14.28%',
+    width: 34,
     height: 32,
   },
   dayCell: {
-    width: '14.28%',
+    width: 34,
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 16,
-  },
-  dayCellInRange: {
-    backgroundColor: '#007AFF22',
-    borderRadius: 0,
+    borderRadius: 6,
   },
   dayCellSelected: {
     backgroundColor: '#007AFF',
-    borderRadius: 16,
+  },
+  dayCellInRange: {
+    backgroundColor: '#007AFF33',
   },
   dayText: {
     fontSize: 12,
-    fontWeight: '600',
   },
   dayTextInRange: {
     color: '#70B5FF',
+  },
+  dayTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
   closeCalendarBtn: {
     marginTop: 10,
@@ -945,7 +1087,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  /* Botón Píldora de Acción y Nuevo */
+  /* Botón Píldora de Acción */
   actionPillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -958,21 +1100,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-  primaryPillBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    height: 36,
-    backgroundColor: '#007AFF',
-  },
-  primaryPillText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
 
-  /* Tabla Responsiva (minWidth 980) */
+  /* Tabla Centrada y Responsive con Ancho de Aplicación */
   tableOuterCenteredContainer: {
     width: '100%',
   },
@@ -1005,7 +1134,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
 
-  /* Columnas Flex Responsivas */
+  /* Columnas Flex Responsivas Compactas */
   colOpId: {
     minWidth: 95,
     flex: 0.9,
@@ -1045,29 +1174,40 @@ const styles = StyleSheet.create({
   clientNameText: {
     fontSize: 12,
     fontWeight: '700',
+    flex: 1,
   },
 
   colLocation: {
-    minWidth: 140,
-    flex: 1.4,
+    minWidth: 130,
+    flex: 1.3,
     paddingRight: 6,
   },
   colDate: {
+    minWidth: 95,
+    flex: 0.9,
+    paddingRight: 6,
+  },
+  colDays: {
+    minWidth: 70,
+    flex: 0.7,
+    paddingRight: 6,
+  },
+  colUnitAmount: {
+    minWidth: 90,
+    flex: 0.9,
+    paddingRight: 6,
+  },
+  colAmount: {
+    minWidth: 90,
+    flex: 0.9,
+    paddingRight: 6,
+  },
+  colPayment: {
     minWidth: 105,
     flex: 1,
     paddingRight: 6,
   },
-  colOperator: {
-    minWidth: 110,
-    flex: 1.1,
-    paddingRight: 6,
-  },
-  colAmount: {
-    minWidth: 100,
-    flex: 1,
-    paddingRight: 6,
-  },
-  colPayment: {
+  colReceipt: {
     minWidth: 105,
     flex: 1,
     paddingRight: 6,
@@ -1085,66 +1225,59 @@ const styles = StyleSheet.create({
     gap: 6,
   },
 
-  /* Textos de Celdas y Badges */
+  /* Botones Circulares de Acciones */
+  actionIconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionDeleteCircle: {
+    backgroundColor: '#F8514922',
+  },
+
   cellText: {
-    fontSize: 12,
+    fontSize: 13,
   },
   cellTextBold: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  cellSubText: {
-    fontSize: 11,
-    marginTop: 1,
+    fontSize: 13,
+    fontWeight: '600',
   },
   amountText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#3FB950',
+  },
+  receiptBadge: {
     fontSize: 12,
-    fontWeight: 'bold',
-  },
-  paymentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
-    gap: 5,
+    borderRadius: 6,
   },
-  paymentBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  statusBadge: {
+  badgeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 5,
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    gap: 6,
+    alignSelf: 'flex-start',
   },
   badgeDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
   },
-
-  /* Botones Circulares de Acciones */
-  actionCircleBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   emptyContainer: {
     padding: spacing.xl,
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 13,
+    fontSize: 14,
   },
 });
-

@@ -33,8 +33,6 @@ export function OperatorsListScreen() {
 
   return (
     <Screen
-      title={label('operator', 'plural')}
-      subtitle="Registro de operadores"
       loading={loading}
       right={<Button title="Nuevo" onPress={() => router.push('/operators/new')} />}
     >
