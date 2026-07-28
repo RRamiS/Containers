@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "dependencies": {
-    "@expo/vector-icons": "^15.1.1",
+    "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.110.8",
     "@tauri-apps/api": "^2.11.1",
@@ -46,7 +46,13 @@
     "web:dev": "expo start --web --port 8081",
     "web:export": "expo export --platform web --output-dir dist",
     "desktop": "node scripts/with-cargo.js tauri dev",
-    "desktop:build": "node scripts/with-cargo.js tauri build"
+    "desktop:build": "node scripts/with-cargo.js tauri build",
+    "mobile:android": "eas build -p android --profile preview",
+    "mobile:ios": "eas build -p ios --profile preview",
+    "mobile:all": "eas build -p all --profile preview",
+    "mobile:android:prod": "eas build -p android --profile production",
+    "mobile:ios:prod": "eas build -p ios --profile production",
+    "mobile:all:prod": "eas build -p all --profile production"
   },
   "private": true
 }
